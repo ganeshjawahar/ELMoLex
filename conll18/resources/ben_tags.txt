@@ -1,0 +1,8 @@
+zh_gsd  /home/benjamin/parsing/NeuroTagger/models/1ff7c1_rid-abe0710_id-zh_gsd_data abe0710-FINAL-pred_train.conllu abe0710-FINAL-pred_dev.conllu   abe0710-SCORE-pred_test
+fr_sequoia  /home/benjamin/parsing/NeuroTagger/models/246e7c_rid-aa8c299_id-fr_sequoia_data aa8c299-FINAL-pred_train.conllu aa8c299-FINAL-pred_dev.conllu   aa8c299-SCORE-pred_test
+da_ddt  /home/benjamin/parsing/NeuroTagger/models/905661_rid-acbdae3_id-da_ddt_data acbdae3-FINAL-pred_train.conllu acbdae3-FINAL-pred_dev.conllu   acbdae3-SCORE-pred_test
+fr_spoken   /home/benjamin/parsing/NeuroTagger/models/216c31_rid-af8a07a_id-fr_spoken_data  af8a07a-FINAL-pred_train.conllu af8a07a-FINAL-pred_dev.conllu   af8a07a-SCORE-pred_test
+tr_imst /home/benjamin/parsing/NeuroTagger/models/869878_rid-a96d66f_id-tr_imst_data    a96d66f-FINAL-pred_train.conllu /a96d66f-FINAL-pred_dev.conllu  a96d66f-SCORE-pred_test
+el_gdt  /home/benjamin/parsing/NeuroTagger/models/f0fbd7_rid-ade5344_id-el_gdt_data ade5344-FINAL-pred_train.conllu ade5344-FINAL-pred_dev.conllu   ade5344-SCORE-pred_test
+hu_szeged   /home/benjamin/parsing/NeuroTagger/models/745759_rid-a80f3a0_id-hu_szeged_data  a80f3a0-FINAL-pred_train.conllu a80f3a0-FINAL-pred_dev.conllu   a80f3a0-SCORE-pred_test
+sv_lines    /home/benjamin/parsing/NeuroTagger/models/17143a_rid-aeab277_id-sv_lines_data   aeab277-FINAL-pred_train.conllu aeab277-FINAL-pred_dev.conllu   aeab277-SCORE-pred_test
