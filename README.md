@@ -22,12 +22,6 @@ bash sample_run/run.sh check
 bash sample_run/run.sh complete
 ```
 
-### Dependencies
-* Pytorch (>=0.4.0)
-* tqdm
-* networkx
-* xlwt
-
 ### Resources
 * [Raw Treebanks](http://universaldependencies.org/conll18/data.html)
 * [UDLexicons](http://pauillac.inria.fr/~sagot/index.html#udlexicons)
