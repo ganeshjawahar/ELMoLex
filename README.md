@@ -1,12 +1,12 @@
 ## ELMoLex - Connecting ELMo and Lexicon features for Dependency Parsing
-Our [CONLL-18 submission system](https://drive.google.com/open?id=1zD4Fa5OaL7YuxZNU7O-MhqyRKvFZ0H6s) for [Parsing](http://universaldependencies.org/conll18/) which uses [Deep Biaffine Parser](https://arxiv.org/abs/1611.01734) as its backbone.
+Our [CoNLL-18 submission system](https://drive.google.com/open?id=1zD4Fa5OaL7YuxZNU7O-MhqyRKvFZ0H6s) for [Parsing](http://universaldependencies.org/conll18/) which uses [Deep Biaffine Parser](https://arxiv.org/abs/1611.01734) as its backbone.
 
 ### Features
 * [ELMo](https://allennlp.org/elmo) features
 * [UDLexicons](http://pauillac.inria.fr/~sagot/index.html#udlexicons) features
 * LSTM pre-training through NLM (NLM Init. feature)
-* Read/Write directly in CONLL-U
-* Integration with CONLL-18 evaluation script
+* Read/Write directly in CoNLL-U
+* Integration with CoNLL-18 evaluation script
 
 ### Quick Start
 * Install the dependencies (ensure conda is working before running the setup):
