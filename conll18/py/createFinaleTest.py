@@ -10,20 +10,20 @@ CL_TB_UD=os.environ['CL_TB_UD']
 CL_WORD_VEC=os.environ['CL_WORD_VEC']
 CL_LEX_LAT=os.environ['CL_LEX_LAT']
 CL_HOME=os.environ['CL_HOME']
-CL_TB_17="/home/ganesh/objects/conll18/conll17-ud-test-2017-05-09"
-TEST_MODEL_DIR=CL_HOME+"/fair_outputs/upload_june30"
+CL_TB_18_RELEASE=os.environ['CL_TB_18_RELEASE']
+TEST_MODEL_DIR=CL_HOME+"/system1"
 TEST_OUTPUT_DIR=CL_HOME+"/testFinale"
 
-run_name = sys.argv[1]
-TEST_OUTPUT_DIR+="/"+run_name
-os.makedirs(TEST_OUTPUT_DIR)
-vocab_expand = int(sys.argv[2])==1
-lex_expand = int(sys.argv[3])==1
-use_ben = int(sys.argv[4])==1
+if not os.path.exists(TEST_OUTPUT_DIR):
+  os.makedirs(TEST_OUTPUT_DIR)
+
+vocab_expand = True
+lex_expand = True
+use_ben = True
 
 def getTb2Size():
   tb2size = {}
-  with open('../resources/data_size.tsv', 'r') as f:
+  with open('conll18/resources/data_size.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       tb = content[0][content[0].find('_')+1:]
@@ -64,28 +64,35 @@ def getFileFromFolder(folder, pattern, start=False):
   return None
 
 def getBenTags():
-  ltcodes_bentags = {}
-  with open('../resources/ben_tags.txt') as f:
+  ben_tags = {}
+  tb2ltcodes, ltcodes2tb = getTreebank2NormalizedName()
+  with open('conll18/resources/ben_tags.txt', 'r') as f:
     for line in f:
-      items = line.strip().split()
-      ben_info = {}
-      ltcode, ben_info["path"], ben_info["train_file"], ben_info["dev_file"], ben_info["test_file"] = items
-      ltcodes_bentags[ltcode] = ben_info
-  return ltcodes_bentags
+      content = line.strip().split()
+      tb_name = ltcodes2tb[content[0]]
+      pred_test = content[1]+'/'+content[4]
+      assert(os.path.exists(pred_test))
+      ben_tags[tb_name] = pred_test
+  return ben_tags
 
 def getTreebank2NormalizedName():
   tb2ltcodes, ltcodes2tb = {}, {}
   for tb in glob.glob(CL_TB_GOLD+"/UD_*"):
     train_f = getFileFromFolder(tb, 'train.conllu')
-    #if train_f!=None:
-    #  norm = train_f.split("/")[-1].split("-")[0]
-    #  tb2ltcodes[tb[tb.find('_')+1:]] = norm
-    #  ltcodes2tb[norm] = tb[tb.find('_')+1:]
-    #else:
-    if train_f==None:
-      norm = tb.split("/")[-1].split("-")[-1]
-      ltcodes2tb[norm] = tb[tb.find('_')+1:]
+    if train_f!=None:
+      norm = train_f.split("/")[-1].split("-")[0]
       tb2ltcodes[tb[tb.find('_')+1:]] = norm
+      ltcodes2tb[norm] = tb[tb.find('_')+1:]
+  
+  lcds = ['pcm','en','th','ja','br','fo','fi','sv','cs']
+  tcds = ['nsc','pud','pud','modern','keb','oft','pud','pud','pud']
+  unnorm = ['Naija-NSC','English-PUD','Thai-PUD','Japanese-Modern','Breton-KEB','Faroese-OFT','Finnish-PUD','Swedish-PUD','Czech-PUD']
+
+  for l, t, u in zip(lcds, tcds, unnorm):
+    lt = l+"_"+t
+    ltcodes2tb[lt] = u
+    tb2ltcodes[u] = lt
+
   return tb2ltcodes, ltcodes2tb
 
 def getWordVectors():
@@ -119,7 +126,7 @@ def getLexicon():
     lex_res[lex] = getApertium(lex_res[lex])
   return lex_res
 
-def getLexiconStr(tb):
+def getLexiconStr(tb, tb2sources, lex_res):
   sources = tb2sources[tb]
   lexicons = {}
   for source in sources:
@@ -136,11 +143,17 @@ def getLexiconStr(tb):
       lexs_arr.append(lex)
     else:
       lexs_arr.append(lex.split('/')[-1])
+  if tb=='Armenian-ArmTDP':
+    lexs_arr.append('UDLex_Armenian-Apertium.conllul')
+  elif tb=='Faroese-OFT':
+    lexs_arr.append('UDLex_Faroese-Apertium.conllul')
+  elif tb=='Kurmanji-MG':
+    lexs_arr.append('UDLex_Kurmanji-Apertium.conllul')
   return ','.join(lexs_arr)
 
-def getDelexLinks():
+def getDelexLinks(lex_res):
   tb2sources = {}
-  with open('../resources/delex.tsv', 'r') as f:
+  with open('conll18/resources/delex.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       assert(len(content)==2)
@@ -172,8 +185,10 @@ def getMoldelInfo():
     assert(os.path.exists(model_info['pred_folder']))
 
     # find word vecs
-    model_info['word_path'] = CL_WORD_VEC + "/cc." +tb_wordvectors[tb]+".300.vec"
-    assert(os.path.exists(model_info['word_path']))
+    model_info['word_path'] = "None"
+    if tb in tb_wordvectors:
+      model_info['word_path'] = CL_WORD_VEC + "/cc." +tb_wordvectors[tb]+".300.vec"
+      assert(os.path.exists(model_info['word_path']))
 
     # find lexicons
     lexicon_str = "None"
@@ -185,63 +200,56 @@ def getMoldelInfo():
         assert(lexicon_str!=None)
     else:
       # delex
-      lexicon_str = getLexiconStr(tb)
+      lexicon_str = getLexiconStr(tb, tb2sources, lex_res)
     model_info['lexicon'] = lexicon_str
 
     ltcode2modelinfo[ltcode] = model_info
+  print('model information recovered for %d treebanks'%(len(ltcode2modelinfo)))
   return ltcode2modelinfo
 
 tb2ltcodes, ltcodes2tb = getTreebank2NormalizedName()
-print(tb2ltcodes)
-print(len(tb2ltcodes))
-sys.exit(0)
 ltcodes_bentags = getBenTags()
 tb_wordvectors = getWordVectors()
 lex_res = getLexicon()
-tb2sources = getDelexLinks()
+tb2sources = getDelexLinks(lex_res)
 tb_direct, tb_crossval, tb_delex = getTreebankDetails(getTb2Size())
 ltcodes_modelinfo = getMoldelInfo()
 
-f_test = open('../shell/testFinale.sh', 'w')
-
-# read json file
-json_file = os.path.join(CL_TB_17, 'metadata.json')
-json_cont = json.load(open(json_file))
+print('writing test master script at %s'%(CL_HOME + '/system1_scripts/testFinale.sh'))
+f_test = open(CL_HOME + '/system1_scripts/testFinale.sh', 'w')
 
 # run over tbs
 discarded_ltcodes = []
-for tb_item in json_cont:
-  lcode, tcode, ltcode = tb_item['lcode'], tb_item['tcode'], tb_item['ltcode']
-  txt_f, ud_f, out_f, gold_f = tb_item['rawfile'], tb_item['psegmorfile'], tb_item['outfile'], tb_item['goldfile']
+for tb_item in glob.glob(CL_TB_18_RELEASE+"/*"):
+  tb = tb_item.split("/")[-1][3:]
+  
+  if tb not in tb2ltcodes:
+    continue
 
-  if ltcode not in ltcodes_modelinfo:
+  ltcode = tb2ltcodes[tb]
+  
+  if tb not in ltcodes_bentags:
     # pre-trained model unavailable
     discarded_ltcodes.append(ltcode)
     continue
+
   train_info = ltcodes_modelinfo[ltcode]
-
-  if use_ben and ltcode not in ltcodes_bentags:
-    # ben-tags not available
-    discarded_ltcodes.append(ltcode)
-    continue
-
-  eval_ud_f = os.path.join(CL_TB_17, ud_f) if not use_ben else os.path.join(ltcodes_bentags[ltcode]["path"], ltcodes_bentags[ltcode]["test_file"])
-  eval_gold_f = os.path.join(os.environ['CL_TB_17'], gold_f)
-  assert(os.path.exists(eval_ud_f)==True)
-  assert(os.path.exists(eval_gold_f)==True)
+  eval_ud_f = ltcodes_bentags[tb]
+  eval_gold_f = getFileFromFolder(os.path.join(CL_TB_18_RELEASE, 'UD_'+tb), 'test.conllu')
+  assert(eval_gold_f!=None)
 
   cmd = "python test.py --word_path "+train_info['word_path']+" --lexicon "+train_info['lexicon']
   cmd += " --system_tb "+eval_ud_f+" --gold_tb "+eval_gold_f
   cmd += " --pred_folder "+train_info['pred_folder']
-  if vocab_expand:
-    cmd += " --vocab_expand"
-  if lex_expand:
-    cmd += " --lex_expand"
+  cmd += " --vocab_expand"
+  cmd += " --lex_expand"
   cmd += " > "+TEST_OUTPUT_DIR+"/out_"+ltcode
   
   f_test.write(cmd+'\n')
 
 f_test.close()
+
+print('trained model or testing file not avaliable for following %d treebanks:'%(len(discarded_ltcodes)))
 print(discarded_ltcodes)
 
 

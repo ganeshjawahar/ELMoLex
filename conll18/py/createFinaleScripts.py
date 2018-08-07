@@ -133,7 +133,7 @@ def getConlluSize(file):
         num_spaces+=1
   return num_spaces
 
-def getLexiconStr(tb):
+def getLexiconStr(tb, tb2sources, lex_res):
   sources = tb2sources[tb]
   lexicons = {}
   for source in sources:
@@ -150,9 +150,15 @@ def getLexiconStr(tb):
       lexs_arr.append(lex)
     else:
       lexs_arr.append(lex.split('/')[-1])
+  if tb=='Armenian-ArmTDP':
+    lexs_arr.append('UDLex_Armenian-Apertium.conllul')
+  elif tb=='Faroese-OFT':
+    lexs_arr.append('UDLex_Faroese-Apertium.conllul')
+  elif tb=='Kurmanji-MG':
+    lexs_arr.append('UDLex_Kurmanji-Apertium.conllul')
   return ','.join(lexs_arr)
 
-def getDelexLinks():
+def getDelexLinks(lex_res):
   tb2sources = {}
   with open('conll18/resources/delex.tsv', 'r') as f:
     for line in f:
@@ -163,12 +169,17 @@ def getDelexLinks():
       for item in content[1].split(','):
         source_tb = item if item=='mixed' else item[item.find('_')+1:]
         tb2sources[targ_tb].append(source_tb)
+      if tb2sources[targ_tb][0]=='mixed':
+        items = []
+        for lex in lex_res:
+          items.append(lex)
+        tb2sources[targ_tb] = items
   return tb2sources
 
 tb2wv = getTreebank2WordEmbedMapping()
 tb2size = getTb2Size()
 lex_res = getLexicon()
-tb2sources = getDelexLinks()
+tb2sources = getDelexLinks(lex_res)
 tb_direct, tb_crossval, tb_delex = getTreebankDetails(tb2size)
 print('# direct = %d; # crossval = %d; # delex = %d; total = %d;'%(len(tb_direct), len(tb_crossval), len(tb_delex), len(tb_direct)+len(tb_crossval)+len(tb_delex)))
 
@@ -297,7 +308,7 @@ for tb in tqdm(tb_delex):
   if not os.path.exists(dest_path):
     os.makedirs(dest_path)
 
-  lexicon_str = getLexiconStr(tb)
+  lexicon_str = getLexiconStr(tb, tb2sources, lex_res)
   train_cmd="python train.py --lex_attn Specific --delex --lexicon "+lexicon_str+" --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --prelstm_args args.json --batch_size "+cur_batch_size+" --num_epochs 250 > "+dest_path+"/out_train"
   f_side.write(train_cmd+"\n")
   f_side.close()

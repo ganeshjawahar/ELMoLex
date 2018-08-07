@@ -8,11 +8,12 @@ from tqdm import tqdm
 CL_TB_GOLD = os.environ['CL_TB_GOLD']
 CL_TB_UD = os.environ['CL_TB_UD']
 CL_UD_MODEL = os.environ['CL_UD_MODEL']
+CL_LEX_LAT=os.environ['CL_LEX_LAT']
 CL_HOME = os.environ['CL_HOME'] + "/data"
 obj_folder = CL_HOME
 print('storing data in %s'%(obj_folder))
 
-def getDelexLinks():
+def getDelexLinks(lex_res):
   tb2sources = {}
   with open('conll18/resources/delex.tsv', 'r') as f:
     for line in f:
@@ -23,6 +24,11 @@ def getDelexLinks():
       for item in content[1].split(','):
         source_tb = item if item=='mixed' else item[item.find('_')+1:]
         tb2sources[targ_tb].append(source_tb)
+      if tb2sources[targ_tb][0]=='mixed':
+        items = []
+        for lex in lex_res:
+          items.append(lex)
+        tb2sources[targ_tb] = items
   return tb2sources
 
 def getTb2Size():
@@ -135,16 +141,37 @@ def writeSents(out_folder, cur_test_inst, cur_test_conllu, cur_train_inst, cur_t
   w_f_conll.close()
   w_f_txt.close()
 
+def getTreebank2NormalizedName():
+  tb2ltcodes, ltcodes2tb = {}, {}
+  for tb in glob.glob(CL_TB_GOLD+"/UD_*"):
+    train_f = getFileFromFolder(tb, 'train.conllu')
+    if train_f!=None:
+      norm = train_f.split("/")[-1].split("-")[0]
+      tb2ltcodes[tb[tb.find('_')+1:]] = norm
+      ltcodes2tb[norm] = tb[tb.find('_')+1:]
+  
+  lcds = ['pcm','en','th','ja','br','fo','fi','sv','cs']
+  tcds = ['nsc','pud','pud','modern','keb','oft','pud','pud','pud']
+  unnorm = ['Naija-NSC','English-PUD','Thai-PUD','Japanese-Modern','Breton-KEB','Faroese-OFT','Finnish-PUD','Swedish-PUD','Czech-PUD']
+
+  for l, t, u in zip(lcds, tcds, unnorm):
+    lt = l+"_"+t
+    ltcodes2tb[lt] = u
+    tb2ltcodes[u] = lt
+
+  return tb2ltcodes, ltcodes2tb
+
 def getBenTags():
   ben_tags = {}
+  tb2ltcodes, ltcodes2tb = getTreebank2NormalizedName()
   with open('conll18/resources/ben_tags.txt', 'r') as f:
     for line in f:
       content = line.strip().split()
-      tb_name = content[0]
+      tb_name = ltcodes2tb[content[0]]
       pred_train = content[1]+'/'+content[2]
       pred_dev = content[1]+'/'+content[3]
       assert(os.path.exists(pred_train)==True)
-      assert(os.path.exists(pred_dev)==True)
+      #assert(os.path.exists(pred_dev)==True)
       ben_tags[tb_name] = [pred_train, pred_dev]
   return ben_tags
 
@@ -158,6 +185,27 @@ def uselessMixedTreebanks():
   return tbs
 ulmt = uselessMixedTreebanks()
 '''
+
+def getApertium(lis):
+  for item in lis:
+    if 'aper' in item.lower():
+      return [item]
+  lis.sort()
+  return lis
+
+def getLexicon():
+  # get all lexicons
+  lex_res = {}
+  for lex in glob.glob(CL_LEX_LAT+"/*.conllul"):
+    lex = lex.split("/")[-1]
+    typ = lex[lex.find('-')+1:].split(".")[0].split("-")[0]
+    lex = lex[lex.find('_')+1:lex.find('-')]
+    if lex not in lex_res:
+      lex_res[lex] = []
+    lex_res[lex].append(typ)
+  for lex in lex_res:
+    lex_res[lex] = getApertium(lex_res[lex])
+  return lex_res
 
 ben_tags = getBenTags()
 tb2size = getTb2Size()
@@ -206,7 +254,11 @@ for treebank in tqdm(tb_crossval):
   cur_tb_run = obj_folder+"/fold/"+treebank
   if not os.path.exists(cur_tb_run):
     os.makedirs(cur_tb_run)
-  copyfile(cur_tb_ud_train_file, cur_tb_run+"/model-train.conllu")
+  if treebank not in ben_tags:
+    copyfile(cur_tb_ud_train_file, cur_tb_run+"/model-train.conllu")
+  else:
+    copyfile(ben_tags[treebank][0], cur_tb_run+"/model-train.conllu")
+    cur_tb_ud_train_file = ben_tags[treebank][0]
 
   raw_sentences, conllu_sentences = read_raw_sentences(cur_tb_ud_train_file)
   subset_size = int(len(raw_sentences)/num_fold)
@@ -228,7 +280,8 @@ for treebank in tqdm(tb_crossval):
   num_treebanks_succ = num_treebanks_succ + 1
 
 print('creating data for treebanks to be run in delexicalized fashion in %s'%(obj_folder+"/delex"))
-tb2sources = getDelexLinks()
+lex_res = getLexicon()
+tb2sources = getDelexLinks(lex_res)
 assert(len(tb2sources)==len(tb_delex))
 #print(tb2sources)
 num_treebanks_succ = 0
@@ -259,9 +312,12 @@ for targ_treebank in tqdm(tb_delex):
       split_folder = 'direct' if src_treebank in tb_direct else 'fold'
       cur_src_tb_splits_folder = obj_folder + '/' + split_folder + '/' + src_treebank
       if src_treebank in ben_tags:
-        continue
-      cur_src_tb_model_train_file = getFileFromFolder(cur_src_tb_splits_folder, 'train.conllu')
-      cur_src_tb_model_dev_file = getFileFromFolder(cur_src_tb_splits_folder, 'dev.conllu')
+        cur_src_tb_model_train_file = ben_tags[src_treebank][0]
+        cur_src_tb_model_dev_file = ben_tags[src_treebank][1]
+        continue # TODO: Ben's conllu files must have the raw sentence.
+      else:
+        cur_src_tb_model_train_file = getFileFromFolder(cur_src_tb_splits_folder, 'train.conllu')
+        cur_src_tb_model_dev_file = getFileFromFolder(cur_src_tb_splits_folder, 'dev.conllu')
       assert(os.path.exists(cur_src_tb_model_train_file)==True)
       raw_sentences, conllu_sentences = read_raw_sentences(cur_src_tb_model_train_file)
       cur_model_train_conllu += conllu_sentences[0:K] if targ_treebank=='Thai-PUD' else conllu_sentences
