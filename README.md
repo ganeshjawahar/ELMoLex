@@ -22,6 +22,10 @@ bash sample_run/run.sh check
 bash sample_run/run.sh complete
 ```
 
+### Finale Run
+Instructions to start the training/testing for the finale run can be found [here](https://github.com/ganeshjawahar/ELMoLex/tree/master/conll18/resources/finale_readme.txt).
+
+
 ### Resources
 * [Raw Treebanks](http://universaldependencies.org/conll18/data.html)
 * [UDLexicons](http://pauillac.inria.fr/~sagot/index.html#udlexicons)
