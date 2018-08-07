@@ -8,9 +8,9 @@ import codecs
 CL_TB_GOLD=os.environ['CL_TB_GOLD']
 CL_TB_UD=os.environ['CL_TB_UD']
 CL_WORD_VEC=os.environ['CL_WORD_VEC']
-CL_RUN_SPLITS=os.environ['CL_RUN_SPLITS']
 CL_LEX_LAT=os.environ['CL_LEX_LAT']
 CL_HOME=os.environ['CL_HOME']
+CL_RUN_SPLITS=CL_HOME+"/data"
 
 obj_folder = CL_RUN_SPLITS
 dest_folder = CL_HOME + '/system1'
@@ -22,6 +22,9 @@ if not os.path.exists(main_script_folder):
   os.makedirs(main_script_folder)
 if not os.path.exists(side_script_folder):
   os.makedirs(side_script_folder)
+
+print('model outputs to be stored at %s'%(dest_folder))
+print('training scripts to be stored at %s'%(main_script_folder))
 
 def getTreebankDetails(tb2size):
   tb_direct, tb_crossval, tb_delex = [], [], []
@@ -59,7 +62,7 @@ def getFileFromFolder(folder, pattern, start=False):
 
 def getTb2Size():
   tb2size = {}
-  with open('tmp/resources/data_size.tsv', 'r') as f:
+  with open('conll18/resources/data_size.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       tb = content[0][content[0].find('_')+1:]
@@ -151,7 +154,7 @@ def getLexiconStr(tb):
 
 def getDelexLinks():
   tb2sources = {}
-  with open('tmp/resources/delex.tsv', 'r') as f:
+  with open('conll18/resources/delex.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       assert(len(content)==2)
@@ -172,6 +175,7 @@ print('# direct = %d; # crossval = %d; # delex = %d; total = %d;'%(len(tb_direct
 f_master = open(main_script_folder+"/master_script.sh", "w")
 
 # direct
+print('preparing direct scripts...')
 num = 0
 for tb in tqdm(tb_direct):
   tb = obj_folder+"/direct/" + tb
@@ -186,13 +190,14 @@ for tb in tqdm(tb_direct):
 
   cur_batch_size, cur_nlm_epochs = str(getBatchSize(cur_train_size)), str(getNumEpochsNLM(cur_train_size))
   dest_path = dest_folder + "/" + tb
-  os.makedirs(dest_path)
+  if not os.path.exists(dest_path):
+    os.makedirs(dest_path)
 
   side_name = str(num)+"_"+tb
   f_side = open(side_script_folder+"/"+side_name+".sh", 'w')
   lang = tb.split('-')[0]
   cmd1 = "mkdir "+dest_path+"/elmo"
-  cmd2 = "python nlm.py --dest_path "+dest_path+"/elmo --bptt 10 --hidden_size 150 --word_path "+w2v_file+" --batch_size "+cur_batch_size+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --num_epochs "+cur_nlm_epochs+" > "+dest_path+"/out_elmo"
+  cmd2 = "python nlm.py --dest_path "+dest_path+"/elmo --word_path "+w2v_file+" --batch_size "+cur_batch_size+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --num_epochs "+cur_nlm_epochs+" > "+dest_path+"/out_elmo"
   f_side.write(cmd1+"\n")
   f_side.write(cmd2+"\n")
   cmd3 = None
@@ -200,20 +205,22 @@ for tb in tqdm(tb_direct):
     # lex + elmo
     lexicon_file = getFileFromFolder(CL_LEX_LAT, 'UDLex_'+lang+'-'+lex_res[lang][0], True)
     assert(lexicon_file!=None)
-    cmd3 = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs 250 > "+dest_path+"/out_train"
+    cmd3 = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo > "+dest_path+"/out_train"
   else:
     # just elmo
-    cmd3 = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs 250 > "+dest_path+"/out_train"
+    cmd3 = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo > "+dest_path+"/out_train"
   f_side.write(cmd3+"\n")
-  cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
-  f_side.write(cmd4+"\n")
+  #cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
+  #f_side.write(cmd4+"\n")
   f_side.close()
-  f_master.write('srun --gres=gpu:1 bash '+side_script_folder+"/"+side_name+".sh\n")
+  f_master.write('bash '+side_script_folder+"/"+side_name+".sh\n")
   num+=1
 
+print('preparing crossval scripts...')
 for tb in tqdm(tb_crossval):
   dest_path = dest_folder + "/" + tb
-  os.makedirs(dest_path)
+  if not os.path.exists(dest_path):
+    os.makedirs(dest_path)
   w2v_file = CL_WORD_VEC + "/cc."+tb2wv[tb]+".300.vec"
   side_name = str(num)+"_"+tb
   f_side = open(side_script_folder+"/"+side_name+".sh", 'w')
@@ -225,7 +232,7 @@ for tb in tqdm(tb_crossval):
   lang = tb.split('-')[0]  
 
   cmd1 = "mkdir "+dest_path+"/elmo"
-  cmd2 = "python nlm.py --dest_path "+dest_path+"/elmo --bptt 10 --hidden_size 150 --word_path "+w2v_file+" --batch_size "+cur_batch_size+" --train_path "+model_train_file+" --dev_path None --test_path None --num_epochs "+cur_nlm_epochs+" > "+dest_path+"/out_elmo"
+  cmd2 = "python nlm.py --dest_path "+dest_path+"/elmo --word_path "+w2v_file+" --batch_size "+cur_batch_size+" --train_path "+model_train_file+" --dev_path None --test_path None --num_epochs "+cur_nlm_epochs+" > "+dest_path+"/out_elmo"
   cmds.append(cmd1)
   cmds.append(cmd2)
 
@@ -237,8 +244,9 @@ for tb in tqdm(tb_crossval):
     assert(os.path.exists(fold_model_dev_file)==True)
     fold_cur_train_size = getConlluSize(fold_model_train_file)
     fold_cur_batch_size, fold_cur_nlm_epochs = str(getBatchSize(fold_cur_train_size)), str(getNumEpochsNLM(fold_cur_train_size))
-    cur_fold_dest = dest_path + '/fold' + str(i)
-    os.makedirs(cur_fold_dest)
+    cur_fold_dest = dest_path + '/fold' + str(i)   
+    if not os.path.exists(cur_fold_dest):
+      os.makedirs(cur_fold_dest)
     cmd = None
     if lang in lex_res:
       # lex + elmo
@@ -260,15 +268,16 @@ for tb in tqdm(tb_crossval):
   else:
     cmd = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path None --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs $epochs > "+dest_path+"/out_train"
   cmds.append(cmd)
-  cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
-  cmds.append(cmd4)
+  #cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
+  #cmds.append(cmd4)
 
   for cmd in cmds:
     f_side.write(cmd+"\n")
   f_side.close()
-  f_master.write('srun --gres=gpu:1 bash '+side_script_folder+"/"+side_name+".sh\n")
+  f_master.write('bash '+side_script_folder+"/"+side_name+".sh\n")
   num+=1
 
+print('preparing delex scripts...')
 for tb in tqdm(tb_delex):
   model_train_file = getFileFromFolder(obj_folder+"/delex/" + tb, 'model-train.conllu')
   if not model_train_file:
@@ -285,12 +294,14 @@ for tb in tqdm(tb_delex):
   cur_batch_size, cur_nlm_epochs = str(getBatchSize(cur_train_size)), str(getNumEpochsNLM(cur_train_size))
   lang = tb.split('-')[0]
   dest_path = dest_folder + "/" + tb
+  if not os.path.exists(dest_path):
+    os.makedirs(dest_path)
 
   lexicon_str = getLexiconStr(tb)
   train_cmd="python train.py --lex_attn Specific --delex --lexicon "+lexicon_str+" --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --prelstm_args args.json --batch_size "+cur_batch_size+" --num_epochs 250 > "+dest_path+"/out_train"
   f_side.write(train_cmd+"\n")
   f_side.close()
-  f_master.write('srun --gres=gpu:1 bash '+side_script_folder+"/"+side_name+".sh\n")
+  f_master.write('bash '+side_script_folder+"/"+side_name+".sh\n")
   num+=1
 
 f_master.close()
