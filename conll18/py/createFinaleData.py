@@ -25,10 +25,10 @@ def getDelexLinks(lex_res):
         source_tb = item if item=='mixed' else item[item.find('_')+1:]
         tb2sources[targ_tb].append(source_tb)
       if tb2sources[targ_tb][0]=='mixed':
-        items = []
-        for lex in lex_res:
-          items.append(lex)
-        tb2sources[targ_tb] = items
+        #items = []
+        #for lex in lex_res:
+        #  items.append(lex)
+        tb2sources[targ_tb] = tb_direct + tb_crossval
   return tb2sources
 
 def getTb2Size():
@@ -234,7 +234,7 @@ for treebank in tqdm(tb_direct):
     copyfile(cur_tb_ud_train_file, cur_tb_run+"/model-train.conllu")
     copyfile(cur_tb_ud_dev_file, cur_tb_run+"/model-dev.conllu")
   else:
-    print('using ben: '+treebank)
+    #print('using ben: '+treebank)
     copyfile(ben_tags[treebank][0], cur_tb_run+"/model-train.conllu")
     copyfile(ben_tags[treebank][1], cur_tb_run+"/model-dev.conllu")
 
@@ -293,11 +293,11 @@ for targ_treebank in tqdm(tb_delex):
   assert(os.path.exists(cur_tb_gold_folder)==True)
 
   sources = tb2sources[targ_treebank]
-  if sources[0] == 'mixed' and proc_mixed:
+  if len(sources)>30 and proc_mixed:
     continue
 
-  if sources[0] == 'mixed':
-    sources = tb_direct + tb_crossval
+  if len(sources)>30: # mixed
+    #sources = tb_direct + tb_crossval
     proc_mixed = True
 
   cur_tb_run = obj_folder+"/delex/"+targ_treebank 
@@ -334,7 +334,7 @@ for targ_treebank in tqdm(tb_delex):
   delex2size[targ_treebank] = [len(cur_model_train_conllu), len(cur_model_dev_conllu)]
 
   num_treebanks_succ = num_treebanks_succ + 1
-# print(delex2size)
+print(delex2size)
 
 
 

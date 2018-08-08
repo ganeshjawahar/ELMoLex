@@ -1,3 +1,7 @@
+'''
+create data with in-house splits (0.9train, 0.1train, 1.0dev) as train, dev and test respectively
+'''
+
 import sys
 import os
 import glob
@@ -8,12 +12,13 @@ from tqdm import tqdm
 CL_TB_GOLD=os.environ['CL_TB_GOLD']
 CL_TB_UD=os.environ['CL_TB_UD']
 CL_UD_MODEL=os.environ['CL_UD_MODEL']
+CL_LEX_LAT=os.environ['CL_LEX_LAT']
+CL_HOME = os.environ['CL_HOME'] + "/data"
+obj_folder = CL_HOME
 
-obj_folder = "/home/ganesh/objects/conll18/finale_splits"
-
-def getDelexLinks():
+def getDelexLinks(lex_res):
   tb2sources = {}
-  with open('../resources/delex.tsv', 'r') as f:
+  with open('conll18/resources/delex.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       assert(len(content)==2)
@@ -22,11 +27,16 @@ def getDelexLinks():
       for item in content[1].split(','):
         source_tb = item if item=='mixed' else item[item.find('_')+1:]
         tb2sources[targ_tb].append(source_tb)
+      if tb2sources[targ_tb][0]=='mixed':
+        #items = []
+        #for lex in lex_res:
+        #  items.append(lex)
+        tb2sources[targ_tb] = tb_direct + tb_crossval
   return tb2sources
 
 def getTb2Size():
   tb2size = {}
-  with open('../resources/data_size.tsv', 'r') as f:
+  with open('conll18/resources/data_size.tsv', 'r') as f:
     for line in f:
       content = line.strip().split()
       tb = content[0][content[0].find('_')+1:]
@@ -134,14 +144,72 @@ def writeSents(out_folder, cur_test_inst, cur_test_conllu, cur_train_inst, cur_t
   w_f_conll.close()
   w_f_txt.close()
 
+def getTreebank2NormalizedName():
+  tb2ltcodes, ltcodes2tb = {}, {}
+  for tb in glob.glob(CL_TB_GOLD+"/UD_*"):
+    train_f = getFileFromFolder(tb, 'train.conllu')
+    if train_f!=None:
+      norm = train_f.split("/")[-1].split("-")[0]
+      tb2ltcodes[tb[tb.find('_')+1:]] = norm
+      ltcodes2tb[norm] = tb[tb.find('_')+1:]
+  
+  lcds = ['pcm','en','th','ja','br','fo','fi','sv','cs']
+  tcds = ['nsc','pud','pud','modern','keb','oft','pud','pud','pud']
+  unnorm = ['Naija-NSC','English-PUD','Thai-PUD','Japanese-Modern','Breton-KEB','Faroese-OFT','Finnish-PUD','Swedish-PUD','Czech-PUD']
+
+  for l, t, u in zip(lcds, tcds, unnorm):
+    lt = l+"_"+t
+    ltcodes2tb[lt] = u
+    tb2ltcodes[u] = lt
+
+  return tb2ltcodes, ltcodes2tb
+
+def getBenTags():
+  ben_tags = {}
+  tb2ltcodes, ltcodes2tb = getTreebank2NormalizedName()
+  with open('conll18/resources/ben_tags.txt', 'r') as f:
+    for line in f:
+      content = line.strip().split()
+      tb_name = ltcodes2tb[content[0]]
+      pred_train = content[1]+'/'+content[2]
+      pred_dev = content[1]+'/'+content[3]
+      pred_test = content[1]+'/'+content[4]
+      assert(os.path.exists(pred_train)==True)
+      #assert(os.path.exists(pred_dev)==True)
+      ben_tags[tb_name] = [pred_train, pred_dev, pred_test]
+  return ben_tags
+
+def getApertium(lis):
+  for item in lis:
+    if 'aper' in item.lower():
+      return [item]
+  lis.sort()
+  return lis
+
+def getLexicon():
+  # get all lexicons
+  lex_res = {}
+  for lex in glob.glob(CL_LEX_LAT+"/*.conllul"):
+    lex = lex.split("/")[-1]
+    typ = lex[lex.find('-')+1:].split(".")[0].split("-")[0]
+    lex = lex[lex.find('_')+1:lex.find('-')]
+    if lex not in lex_res:
+      lex_res[lex] = []
+    lex_res[lex].append(typ)
+  for lex in lex_res:
+    lex_res[lex] = getApertium(lex_res[lex])
+  return lex_res
+
+ben_tags = getBenTags()
 tb2size = getTb2Size()
 tb_direct, tb_crossval, tb_delex = getTreebankDetails(tb2size)
 print('# direct = %d; # crossval = %d; # delex = %d; total = %d;'%(len(tb_direct), len(tb_crossval), len(tb_delex), len(tb_direct)+len(tb_crossval)+len(tb_delex)))
 
-w_f = open('cdat.sh', 'w')
-print('creating data for treebanks with train and dev...')
+w_f = open('conll18/shell/cdat.sh', 'w')
+print('creating data for treebanks with train and dev in %s'%(obj_folder+"/direct"))
 num_treebanks_succ = 0
-os.makedirs(obj_folder+"/direct")
+if not os.path.exists(obj_folder+"/direct"):
+  os.makedirs(obj_folder+"/direct")
 for treebank in tqdm(tb_direct):
   cur_tb_gold_folder = CL_TB_GOLD + "/UD_" + treebank
   cur_tb_ud_folder = CL_TB_UD + "/UD_" + treebank
@@ -159,7 +227,8 @@ for treebank in tqdm(tb_direct):
   assert(os.path.exists(cur_tb_gold_dev_txt_file)==True)
 
   cur_tb_run = obj_folder+"/direct/"+treebank
-  os.makedirs(cur_tb_run)
+  if not os.path.exists(cur_tb_run):
+    os.makedirs(cur_tb_run)
   train_raw_sentences, train_conllu_sentences = read_raw_sentences(cur_tb_ud_train_file)
   cur_dev_inst, cur_dev_conllu, cur_train_inst, cur_train_conllu = [], [], [], []
   num_train = int(len(train_raw_sentences)*0.9)
@@ -176,15 +245,13 @@ for treebank in tqdm(tb_direct):
   copyfile(cur_tb_gold_dev_file, cur_tb_run+"/eval-gold.conllu")
 
   num_treebanks_succ = num_treebanks_succ + 1
-  #if num_treebanks_succ == 2:
-  #  break
 w_f.close()
 
-'''
 num_fold = 5
-print('creating data for treebanks which has to be cross-folded...')
+print('creating data for treebanks which has to be cross-folded in %s'%(obj_folder+"/fold"))
 num_treebanks_succ = 0
-os.makedirs(obj_folder+"/fold")
+if not os.path.exists(obj_folder+"/fold"):
+  os.makedirs(obj_folder+"/fold")
 for treebank in tqdm(tb_crossval):
   cur_tb_ud_folder = CL_TB_UD + "/UD_" + treebank
   cur_ud_model_file = CL_UD_MODEL + "/" + treebank.lower() + "-ud-2.2-conll18-180430.udpipe"
@@ -194,7 +261,8 @@ for treebank in tqdm(tb_crossval):
   assert(os.path.exists(cur_tb_ud_train_file)==True)
 
   cur_tb_run = obj_folder+"/fold/"+treebank
-  os.makedirs(cur_tb_run)
+  if not os.path.exists(cur_tb_run):
+    os.makedirs(cur_tb_run)
   raw_sentences, conllu_sentences = read_raw_sentences(cur_tb_ud_train_file)
   cur_test_inst, cur_test_conllu, cur_train_inst, cur_train_conllu = [], [], [], []
   num_train = int(len(raw_sentences)*0.9)
@@ -223,33 +291,32 @@ for treebank in tqdm(tb_crossval):
         cur_fold_train_conllu.append(cur_train_conllu[si])
     writeSents(cur_fold_run, cur_fold_dev_inst, cur_fold_dev_conllu, cur_fold_train_inst, cur_fold_train_conllu, 'dev')
   num_treebanks_succ = num_treebanks_succ + 1
-  #if num_treebanks_succ == 1:
-  #  break
-'''
 
-w_f = open('../shell/cdat_delex.sh', 'w')
-print('creating data for treebanks to be run in delexicalized fashion...')
-tb2sources = getDelexLinks()
+w_f = open('conll18/shell/cdat_delex.sh', 'w')
+print('creating data for treebanks to be run in delexicalized fashion in %s'%(obj_folder+"/delex"))
+lex_res = getLexicon()
+tb2sources = getDelexLinks(lex_res)
 assert(len(tb2sources)==len(tb_delex))
+#print(tb2sources)
 
-print(tb2sources)
 num_treebanks_succ = 0
-os.makedirs(obj_folder+"/delex")
-proc_mixed, delex2size, K = False, {}, 100
+if not os.path.exists(obj_folder+"/delex"):
+  os.makedirs(obj_folder+"/delex")
+proc_mixed, delex2size, K = False, {}, 300
 for targ_treebank in tqdm(tb_delex):
   cur_tb_gold_folder = CL_TB_GOLD + "/UD_" + targ_treebank
   assert(os.path.exists(cur_tb_gold_folder)==True)
 
   sources = tb2sources[targ_treebank]
-  if sources[0] == 'mixed' and proc_mixed:
+  if len(sources)>30 and proc_mixed:
     continue
 
-  if sources[0] == 'mixed':
-    sources = tb_direct + tb_crossval
+  if len(sources)>30: # mixed
     proc_mixed = True
 
-  cur_tb_run = obj_folder+"/delex/"+targ_treebank
-  os.makedirs(cur_tb_run)
+  cur_tb_run = obj_folder+"/delex/"+targ_treebank 
+  if not os.path.exists(cur_tb_run):
+    os.makedirs(cur_tb_run)
 
   # use train.conllu for evaluation
   gold_train_txt = getFileFromFolder(cur_tb_gold_folder, 'train.txt')
@@ -267,21 +334,29 @@ for targ_treebank in tqdm(tb_delex):
     if src_treebank in tb_direct or src_treebank in tb_crossval:
       split_folder = 'direct' if src_treebank in tb_direct else 'fold'
       cur_src_tb_splits_folder = obj_folder + '/' + split_folder + '/' + src_treebank
+      '''
+      if src_treebank in ben_tags:
+        cur_src_tb_model_train_file = ben_tags[src_treebank][0]
+        cur_src_tb_model_dev_file = ben_tags[src_treebank][1]
+        cur_src_tb_model_test_file = ben_tags[src_treebank][2]
+        continue # TODO: Ben's conllu files must have the raw sentence.
+      else:
+      '''
       cur_src_tb_model_train_file = getFileFromFolder(cur_src_tb_splits_folder, 'train.conllu')
       cur_src_tb_model_dev_file = getFileFromFolder(cur_src_tb_splits_folder, 'dev.conllu')
       cur_src_tb_model_test_file = getFileFromFolder(cur_src_tb_splits_folder, 'test.conllu')
       assert(os.path.exists(cur_src_tb_model_train_file)==True)
       assert(os.path.exists(cur_src_tb_model_test_file)==True)
       raw_sentences, conllu_sentences = read_raw_sentences(cur_src_tb_model_train_file)
-      cur_model_train_conllu += conllu_sentences[0:K] if sources[0] == 'mixed' else conllu_sentences
-      cur_model_train_txt += raw_sentences[0:K] if sources[0] == 'mixed' else raw_sentences
+      cur_model_train_conllu += conllu_sentences[0:K] if targ_treebank=='Thai-PUD' else conllu_sentences
+      cur_model_train_txt += raw_sentences[0:K] if targ_treebank == 'Thai-PUD' else raw_sentences
       if cur_src_tb_model_dev_file!=None:
         raw_sentences, conllu_sentences = read_raw_sentences(cur_src_tb_model_dev_file)
-        cur_model_dev_conllu += conllu_sentences[0:K//10] if sources[0] == 'mixed' else conllu_sentences
-        cur_model_dev_txt += raw_sentences[0:K//10] if sources[0] == 'mixed' else raw_sentences
+        cur_model_dev_conllu += conllu_sentences[0:K//10] if targ_treebank == 'Thai-PUD' else conllu_sentences
+        cur_model_dev_txt += raw_sentences[0:K//10] if targ_treebank == 'Thai-PUD' else raw_sentences
       raw_sentences, conllu_sentences = read_raw_sentences(cur_src_tb_model_test_file)
-      cur_model_test_conllu += conllu_sentences[0:K//10] if sources[0] == 'mixed' else conllu_sentences
-      cur_model_test_txt += raw_sentences[0:K//10] if sources[0] == 'mixed' else raw_sentences
+      cur_model_test_conllu += conllu_sentences[0:K//10] if targ_treebank == 'Thai-PUD' else conllu_sentences
+      cur_model_test_txt += raw_sentences[0:K//10] if targ_treebank == 'Thai-PUD' else raw_sentences
 
   # write model files
   writeSentsJustOne(cur_tb_run, cur_model_train_txt, cur_model_train_conllu, 'model-train')
@@ -291,11 +366,13 @@ for targ_treebank in tqdm(tb_delex):
   delex2size[targ_treebank] = [len(cur_model_train_conllu), len(cur_model_dev_conllu), len(cur_model_test_conllu)]
 
   num_treebanks_succ = num_treebanks_succ + 1
-  #if num_treebanks_succ == 2:
-  #  break
-w_f.close()
-print(delex2size)
 
+w_f.close()
+#print(delex2size)
+
+print('run the following:')
+print('bash conll18/shell/cdat.sh')
+print('bash conll18/shell/cdat_delex.sh')
 
 
 

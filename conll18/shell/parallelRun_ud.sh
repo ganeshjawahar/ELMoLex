@@ -1,14 +1,6 @@
 
 process(){
-  source activate pytorch0.4
-  num_cmd=`echo $1 | grep -o '|' | wc -l`
-  let 'num_cmd++'
-  for ((c=1;c<=$num_cmd;c+=1))
-  do
-    cmd=`echo $1 | cut -d "|" -f $c`
-    eval $cmd
-  done
-  source deactivate
+  eval $1
   exit 0
 }
 
