@@ -1,3 +1,5 @@
+# creates the final test scripts to be run
+
 import os
 import sys
 import glob
@@ -5,21 +7,18 @@ import operator
 from tqdm import tqdm
 import json
 
-CL_TB_GOLD=os.environ['CL_TB_GOLD']
-CL_TB_UD=os.environ['CL_TB_UD']
-CL_WORD_VEC=os.environ['CL_WORD_VEC']
-CL_LEX_LAT=os.environ['CL_LEX_LAT']
-CL_HOME=os.environ['CL_HOME']
-CL_TB_18_RELEASE=os.environ['CL_TB_18_RELEASE']
-TEST_MODEL_DIR=CL_HOME+"/system1"
-TEST_OUTPUT_DIR=CL_HOME+"/testFinale"
+CL_TB_GOLD = os.environ['CL_TB_GOLD']
+CL_TB_UD = os.environ['CL_TB_UD']
+CL_WORD_VEC = os.environ['CL_WORD_VEC']
+CL_LEX_LAT = os.environ['CL_LEX_LAT']
+CL_HOME = os.environ['CL_HOME']
+CL_TB_18_RELEASE = os.environ['CL_TB_18_RELEASE']
+CL_TB_18_TEST_UDPIPE_PREDS = os.environ['CL_TB_18_TEST_UDPIPE_PREDS']
+TEST_MODEL_DIR = CL_HOME + "/system1"
+TEST_OUTPUT_DIR = CL_HOME + "/testFinale"
 
 if not os.path.exists(TEST_OUTPUT_DIR):
   os.makedirs(TEST_OUTPUT_DIR)
-
-vocab_expand = True
-lex_expand = True
-use_ben = True
 
 def getTb2Size():
   tb2size = {}
@@ -204,6 +203,13 @@ def getMoldelInfo():
     model_info['lexicon'] = lexicon_str
 
     ltcode2modelinfo[ltcode] = model_info
+
+    if ltcode=='th_pud':
+      # handle other treebanks which needs to use mixed treebank
+      ltcode2modelinfo['pcm_nsc'] = ltcode2modelinfo['th_pud'] # naija
+      ltcode2modelinfo['br_keb'] = ltcode2modelinfo['th_pud'] # breton
+      ltcode2modelinfo['hsb_ufal'] = ltcode2modelinfo['th_pud'] # upper_sorbian
+
   print('model information recovered for %d treebanks'%(len(ltcode2modelinfo)))
   return ltcode2modelinfo
 
@@ -227,29 +233,32 @@ for tb_item in glob.glob(CL_TB_18_RELEASE+"/*"):
     continue
 
   ltcode = tb2ltcodes[tb]
-  
-  if tb not in ltcodes_bentags:
-    # pre-trained model unavailable
-    discarded_ltcodes.append(ltcode)
-    continue
-
   train_info = ltcodes_modelinfo[ltcode]
-  eval_ud_f = ltcodes_bentags[tb]
+  evals = []
+  eval_bn_f = ltcodes_bentags[tb] if tb in ltcodes_bentags else None
+  if eval_bn_f!=None:
+    evals.append(['bentags', eval_bn_f])
+  else:
+    discarded_ltcodes.append(ltcode)
   eval_gold_f = getFileFromFolder(os.path.join(CL_TB_18_RELEASE, 'UD_'+tb), 'test.conllu')
-  assert(eval_gold_f!=None)
+  assert(os.path.exists(eval_gold_f))
+  eval_ud_f = getFileFromFolder(os.path.join(CL_TB_18_TEST_UDPIPE_PREDS), ltcode, True) 
+  assert(os.path.exists(eval_ud_f))
+  evals.append(['udtags', eval_ud_f])
 
-  cmd = "python test.py --word_path "+train_info['word_path']+" --lexicon "+train_info['lexicon']
-  cmd += " --system_tb "+eval_ud_f+" --gold_tb "+eval_gold_f
-  cmd += " --pred_folder "+train_info['pred_folder']
-  cmd += " --vocab_expand"
-  cmd += " --lex_expand"
-  cmd += " > "+TEST_OUTPUT_DIR+"/out_"+ltcode
-  
-  f_test.write(cmd+'\n')
+  for fname, eval_f in evals:
+    cmd = "python test.py --word_path "+train_info['word_path']+" --lexicon "+train_info['lexicon']
+    cmd += " --system_tb "+eval_f+" --gold_tb "+eval_gold_f
+    cmd += " --pred_folder "+train_info['pred_folder']
+    cmd += " --vocab_expand"
+    cmd += " --lex_expand"
+    cmd += " > "+TEST_OUTPUT_DIR+"/out_"+ltcode+"_"+fname
+    
+    f_test.write(cmd+'\n')
 
 f_test.close()
 
-print('trained model or testing file not avaliable for following %d treebanks:'%(len(discarded_ltcodes)))
+print('ben testset not avaliable for following %d treebanks:'%(len(discarded_ltcodes)))
 print(discarded_ltcodes)
 
 

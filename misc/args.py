@@ -12,9 +12,9 @@ def parse_test_args():
   args_parser.add_argument('--tb_out', type=str, default='pred_tree.conllu', help='file name for writing the predicted parse tree')
 
   # aux
-  args_parser.add_argument('--lex_expand', action='store_false', help='should try to expand lexical information from UDLexicons for oov words?')
+  args_parser.add_argument('--lex_expand', action='store_true', help='should try to expand lexical information from UDLexicons for oov words?')
   args_parser.add_argument('--lexicon', type=str, default='/home/ganesh/data/conll/UDLexicons.0.2/UDLex_English-Apertium.conllul', help='path to the lexicon')
-  args_parser.add_argument('--vocab_expand', action='store_false', help='should try to expand word vocabulary from pre-trained word embeddings for oov words?')
+  args_parser.add_argument('--vocab_expand', action='store_true', help='should try to expand word vocabulary from pre-trained word embeddings for oov words?')
   args_parser.add_argument('--word_path', type=str, default='/home/ganesh/data/conll/fair_vectors_raw/cc.en.300.vec', help='path for word embedding dict')
 
   args_parser.add_argument('--epoch', type=int, default=-1, help='which model_epoch_<int> you want to use? Leave it to -1 for choosing the latest model.')
@@ -63,7 +63,7 @@ def parse_train_args():
   args_parser.add_argument('--prelstm_args', type=str, default='/home/ganesh/objects/neurogp/en_15/nlm/args.json', help='settings file for pre-trained lstm models. leave it empty for no initialization.')
 
   # elmo
-  args_parser.add_argument('--elmo', action='store_false', help='use elmo features? (ensure lstm_dir is present)')
+  args_parser.add_argument('--elmo', action='store_true', help='use elmo features? (ensure lstm_dir is present)')
 
   # lexicon
   args_parser.add_argument('--lexicon', type=str, default='/home/ganesh/data/conll/UDLexicons.0.2/UDLex_English-Apertium.conllul', help='path to the lexicon')

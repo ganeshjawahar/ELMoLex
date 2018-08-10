@@ -11,6 +11,9 @@ CL_WORD_VEC=os.environ['CL_WORD_VEC']
 CL_LEX_LAT=os.environ['CL_LEX_LAT']
 CL_HOME=os.environ['CL_HOME']
 CL_RUN_SPLITS=CL_HOME+"/data"
+dry_run = len(sys.argv)>1
+if dry_run:
+  print('doing trail run...')
 
 obj_folder = CL_RUN_SPLITS
 dest_folder = CL_HOME + '/system1'
@@ -203,6 +206,11 @@ for tb in tqdm(tb_direct):
   dest_path = dest_folder + "/" + tb
   if not os.path.exists(dest_path):
     os.makedirs(dest_path)
+  
+  cur_parser_epochs = '250'
+  if dry_run:
+    cur_nlm_epochs = '1'
+    cur_parser_epochs = '1'
 
   side_name = str(num)+"_"+tb
   f_side = open(side_script_folder+"/"+side_name+".sh", 'w')
@@ -216,10 +224,11 @@ for tb in tqdm(tb_direct):
     # lex + elmo
     lexicon_file = getFileFromFolder(CL_LEX_LAT, 'UDLex_'+lang+'-'+lex_res[lang][0], True)
     assert(lexicon_file!=None)
-    cmd3 = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo > "+dest_path+"/out_train"
+    lex_trim_str = '' if tb not in ['Ancient_Greek-PROIEL', 'Ancient_Greek-Perseus', 'Czech-PDT'] else '--lex_trim '
+    cmd3 = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+cur_parser_epochs+" "+lex_trim_str+"> "+dest_path+"/out_train"
   else:
     # just elmo
-    cmd3 = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo > "+dest_path+"/out_train"
+    cmd3 = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+cur_parser_epochs+" > "+dest_path+"/out_train"
   f_side.write(cmd3+"\n")
   #cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
   #f_side.write(cmd4+"\n")
@@ -242,6 +251,11 @@ for tb in tqdm(tb_crossval):
   cur_batch_size, cur_nlm_epochs = str(getBatchSize(cur_train_size)), str(getNumEpochsNLM(cur_train_size))
   lang = tb.split('-')[0]  
 
+  cur_parser_epochs = '250'
+  if dry_run:
+    cur_nlm_epochs = '1'
+    cur_parser_epochs = '1'
+
   cmd1 = "mkdir "+dest_path+"/elmo"
   cmd2 = "python nlm.py --dest_path "+dest_path+"/elmo --word_path "+w2v_file+" --batch_size "+cur_batch_size+" --train_path "+model_train_file+" --dev_path None --test_path None --num_epochs "+cur_nlm_epochs+" > "+dest_path+"/out_elmo"
   cmds.append(cmd1)
@@ -263,21 +277,24 @@ for tb in tqdm(tb_crossval):
       # lex + elmo
       lexicon_file = getFileFromFolder(CL_LEX_LAT, 'UDLex_'+lang+'-'+lex_res[lang][0], True)
       assert(lexicon_file!=None)
-      cmd = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+cur_fold_dest+" --word_path "+w2v_file+" --train_path "+fold_model_train_file+" --dev_path "+fold_model_dev_file+" --test_path None --batch_size "+fold_cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs 250 > "+cur_fold_dest+"/out_train"
+      cmd = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+cur_fold_dest+" --word_path "+w2v_file+" --train_path "+fold_model_train_file+" --dev_path "+fold_model_dev_file+" --test_path None --batch_size "+fold_cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+cur_parser_epochs+" > "+cur_fold_dest+"/out_train"
     else:
       # just elmo
-      cmd = "python train.py --lexicon None --dest_path "+cur_fold_dest+" --word_path "+w2v_file+" --train_path "+fold_model_train_file+" --dev_path "+fold_model_dev_file+" --test_path None --batch_size "+fold_cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs 250 > "+cur_fold_dest+"/out_train"
+      cmd = "python train.py --lexicon None --dest_path "+cur_fold_dest+" --word_path "+w2v_file+" --train_path "+fold_model_train_file+" --dev_path "+fold_model_dev_file+" --test_path None --batch_size "+fold_cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+cur_parser_epochs+" > "+cur_fold_dest+"/out_train"
     cmds.append(cmd)
-  cmd="epochs=`python tmp/py/foldgetAvgEpoch.py "+dest_path+"`"
+  cmd="epochs=`python conll18/py/foldgetAvgEpoch.py "+dest_path+"`"
   cmds.append(cmd)
+  final_train_epochs = '$epochs'
+  if dry_run:
+    final_train_epochs = '1'
   cmd = None
   if lang in lex_res:
     # lex + elmo
     lexicon_file = getFileFromFolder(CL_LEX_LAT, 'UDLex_'+lang+'-'+lex_res[lang][0], True)
     assert(lexicon_file!=None)
-    cmd = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path None --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs $epochs > "+dest_path+"/out_train"
+    cmd = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path None --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+final_train_epochs+" > "+dest_path+"/out_train"
   else:
-    cmd = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path None --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs $epochs > "+dest_path+"/out_train"
+    cmd = "python train.py --lexicon None --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path None --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+final_train_epochs+" > "+dest_path+"/out_train"
   cmds.append(cmd)
   #cmd4 = "python ltrans.py --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" > "+dest_path+"/out_ltrans"
   #cmds.append(cmd4)
@@ -308,8 +325,13 @@ for tb in tqdm(tb_delex):
   if not os.path.exists(dest_path):
     os.makedirs(dest_path)
 
+  cur_parser_epochs = '250'
+  if dry_run:
+    cur_parser_epochs = '1'
+
   lexicon_str = getLexiconStr(tb, tb2sources, lex_res)
-  train_cmd="python train.py --lex_attn Specific --delex --lexicon "+lexicon_str+" --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --prelstm_args args.json --batch_size "+cur_batch_size+" --num_epochs 250 > "+dest_path+"/out_train"
+  lex_trim_str = '' if tb not in ['Thai-PUD', 'Armenian-ArmTDP'] else '--lex_trim '
+  train_cmd="python train.py --lex_attn Specific --delex --lexicon "+lexicon_str+" --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --prelstm_args args.json --batch_size "+cur_batch_size+" --num_epochs "+cur_parser_epochs+" "+lex_trim_str+"> "+dest_path+"/out_train"
   f_side.write(train_cmd+"\n")
   f_side.close()
   f_master.write('bash '+side_script_folder+"/"+side_name+".sh\n")
