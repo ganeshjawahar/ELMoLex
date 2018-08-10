@@ -3,67 +3,68 @@
 import sys
 import os
 import glob
-def getTb2Size():
-  tb2size = {}
-  with open('conll18/resources/data_size.tsv', 'r') as f:
+
+CL_HOME = os.environ['CL_HOME']
+obj_folder = CL_HOME + "/testFinale"
+
+las_f = obj_folder + "/finale_las.tsv"
+mlas_f = obj_folder + "/finale_mlas.tsv"
+blex_f = obj_folder + "/finale_blex.tsv"
+
+ltcode2results = {}
+for out_file in glob.glob(obj_folder+"/out_*"):
+  fname = out_file.split("/")[-1]
+  ltcode = fname[fname.find('_')+1:fname.rfind('_')]
+  las_score, mlas_score, blex_score = None, None, None
+  with open(out_file, 'r') as f:
     for line in f:
-      content = line.strip().split()
-      tb = content[0][content[0].find('_')+1:]
-      tb2size[tb] = [int(content[1]), int(content[2])]
-  return tb2size
-def getTreebankDetails(tb2size):
-  CL_TB_GOLD = os.environ['CL_TB_GOLD']
-  tb_direct, tb_crossval, tb_delex = [], [], []
-  for tb in glob.glob(CL_TB_GOLD+"/UD_*"):
-    tb = tb.split("/")[-1]
-    is_train, is_dev = False, False
-    for conllu_f in glob.glob(CL_TB_GOLD+"/"+tb+"/*.conllu"):
-      conllu_f = conllu_f.split("/")[-1]
-      if 'train' in conllu_f:
-        is_train = True
-      if 'dev' in conllu_f:
-        is_dev = True
-    tb = tb[tb.find('_')+1:]
-    if is_train and is_dev:
-      tb_direct.append(tb)
-    elif is_train:
-      if tb2size[tb][0] > 50:
-        tb_crossval.append(tb)
-      else:
-        tb_delex.append(tb)
-    else:
-      tb_delex.append(tb)
+      line = line.strip()
+      if line.startswith("LAS F1"):
+        las_score = line
+      if line.startswith("MLAS"):
+        mlas_score = line
+      if line.startswith("BLEX"):
+        blex_score = line
+  if las_score and mlas_score and blex_score:
+    if ltcode not in ltcode2results:
+      ltcode2results[ltcode] = {}
+    if fname.endswith('udtags'):
+      ltcode2results[ltcode]['udpipe'] = {}
+      for name, score in [('las', las_score), ('mlas', mlas_score), ('blex', blex_score)]:
+        ltcode2results[ltcode]['udpipe'][name] = score.split()[3] if name == 'las' else score.split()[2]
+      ltcode2results[ltcode]['elmolex-udtags'] = {}
+      for name, score in [('las', las_score), ('mlas', mlas_score), ('blex', blex_score)]:
+        ltcode2results[ltcode]['elmolex-udtags'][name] = score.split()[5] if name == 'las' else score.split()[4]
+    if fname.endswith('bentags'):
+      ltcode2results[ltcode]['elmolex-bentags'] = {}
+      for name, score in [('las', las_score), ('mlas', mlas_score), ('blex', blex_score)]:
+        ltcode2results[ltcode]['elmolex-bentags'][name] = score.split()[5] if name == 'las' else score.split()[4]
 
-  return tb_direct, tb_crossval, tb_delex
+def get_map(mp, fst, scnd):
+  if fst in mp:
+    if scnd in mp[fst]:
+      return mp[fst][scnd]
+  return 'None'
 
-src = "/home/ganesh/objects/post_finale/system1"
-not_done = []
-for source_folder in glob.glob(src+"/*"):
-  last_line = None
-  with open(source_folder+"/out_train") as f:
-    for line in f:
-      last_line = line.strip()
-  if last_line==None or not last_line.startswith("Time (mins)"):
-    not_done.append(source_folder.split("/")[-1])
+las_w = open(las_f, 'w')
+mlas_w = open(mlas_f, 'w')
+blex_w = open(blex_f, 'w')
+header = 'tb\tudpipe\telmolex-udtags\telmolex-bentags\n'
+las_w.write(header)
+mlas_w.write(header)
+blex_w.write(header)
+for ltcode in sorted(ltcode2results):
+  for name, w in [('las', las_w), ('mlas', mlas_w), ('blex', blex_w)]:
+    udpipe = get_map(ltcode2results[ltcode], 'udpipe', name)
+    udtags = get_map(ltcode2results[ltcode], 'elmolex-udtags', name)
+    bentags = get_map(ltcode2results[ltcode], 'elmolex-bentags', name)
+    w.write(ltcode+"\t"+udpipe+"\t"+udtags+"\t"+bentags+"\n")
+las_w.close()
+mlas_w.close()
+blex_w.close()
 
-print(not_done)
-print(len(not_done))
-'''
-tb2size = getTb2Size()
-tb_direct, tb_crossval, tb_delex = getTreebankDetails(tb2size)
-
-r = open("/tmp/conll2.sh", 'r')
-lmap = {}
-for line in r:
-  line = line.strip()
-  lmap[line.split()[1].split("/")[-1].split("_")[1]]=line
-r.close()
-
-w = open('/tmp/conll.sh', 'w')
-for done in not_done:
-  if done+".sh" in lmap:
-    w.write(lmap[done+".sh"]+"\n")
-w.close()
-'''
-
+print('las, mlas and blex results respecitvely can be fetched from the following files:')
+print(las_f)
+print(mlas_f)
+print(blex_f)
 

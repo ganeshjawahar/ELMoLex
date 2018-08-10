@@ -224,7 +224,7 @@ for tb in tqdm(tb_direct):
     # lex + elmo
     lexicon_file = getFileFromFolder(CL_LEX_LAT, 'UDLex_'+lang+'-'+lex_res[lang][0], True)
     assert(lexicon_file!=None)
-    lex_trim_str = '' if tb not in ['Ancient_Greek-PROIEL', 'Ancient_Greek-Perseus', 'Czech-PDT'] else '--lex_trim '
+    lex_trim_str = '' if tb not in ['Ancient_Greek-PROIEL', 'Ancient_Greek-Perseus', 'Czech-PDT'] else '--lex_trim ' # TODO: handle lex-trim within elmolex code
     cmd3 = "python train.py --lexicon "+lexicon_file+" --lex_attn Specific --dest_path "+dest_path+" --word_path "+w2v_file+" --train_path "+model_train_file+" --dev_path "+model_dev_file+" --test_path None --batch_size "+cur_batch_size+" --prelstm_args "+dest_path+"/elmo/args.json --elmo --num_epochs "+cur_parser_epochs+" "+lex_trim_str+"> "+dest_path+"/out_train"
   else:
     # just elmo

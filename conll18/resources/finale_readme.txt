@@ -12,6 +12,7 @@ export CL_WORD_VEC=/home/ganesh/data/conll/fair_vectors_raw (path to vectors dow
 export CL_LEX_LAT=/home/ganesh/data/conll/UDLexicons.0.2 (path to the http://pauillac.inria.fr/~sagot/index.html#udlexicons)
 export CL_HOME=/home/ganesh/objects/post_finale (path to an empty folder where all the intermediate files created during training and testing would be stored.)
 export CL_TB_18_RELEASE=/home/ganesh/data/conll/ud-treebanks-v2.2 (path to the http://hdl.handle.net/11234/1-2837)
+export CL_TB_18_TEST_UDPIPE_PREDS=/home/ganesh/objects/post_finale/tb18_test_udpipe_preds (path to the folder created using runUdpipeOn18Test.py script)
 
 Step-2:
 =======
@@ -33,6 +34,11 @@ Create the finale testing scripts
 cd ELMoLex/
 python conll18/py/createFinaleTest.py
 
+Step-5:
+=======
+Generate the final report
+cd ELMoLex/
+python conll18/py/createFinaleReport.py
 
 
 
