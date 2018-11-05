@@ -66,6 +66,7 @@ def save_train_args(path, args, other_args):
   save_args['bptt'] = args.bptt
   save_args['num_xpos'] = other_args[6]
   save_args['delex'] = args.delex
+  save_args['n_trainable_params'] = other_args[7]
   file_path = os.path.join(path, 'args.json')
   json.dump(save_args, open(file_path, 'w'), indent=4)
   print('saved settings as a json in: '+str(file_path))

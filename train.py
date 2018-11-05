@@ -1,3 +1,5 @@
+ # -*- coding: utf-8 -*-
+
 '''
 ELMoLex parser - training
 '''
@@ -7,7 +9,7 @@ import os
 from tqdm import tqdm
 import pickle
 import time
-
+import numpy as np 
 from dat import ioutils, conllu_data
 from misc import args as train_args
 from dat.constants import NUM_SYMBOLIC_TAGS
@@ -18,10 +20,18 @@ from torch.nn.utils import clip_grad_norm_ as clip_grad_norm
 torch.manual_seed(123)
 
 args = train_args.parse_train_args()
+print("ELMO set to ", args.elmo)
+print("RANDOM INIT set to ", args.random_init)
+print("LEXICON set to ", args.lexicon)
+print("POS set to ", args.pos)
+print("CHAR set to ", str(args.char))
+
+
+
+
 
 use_gpu = torch.cuda.is_available()
 print("GPU found: "+str(use_gpu))
-
 print('storing everything in '+str(args.dest_path))
 dict_path = os.path.join(args.dest_path, 'dict')
 models_path = os.path.join(args.dest_path, 'model')
@@ -39,7 +49,8 @@ print('creating dictionaries...')
 word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary = conllu_data.create_dict(dict_path, args.train_path, args.dev_path, args.test_path, word_embed, args.dry_run, vocab_trim=args.vocab_trim)
 print('words = '+str(word_dictionary.size())+'; chars = '+str(char_dictionary.size())+'; pos = '+str(pos_dictionary.size())+'; xpos = '+str(xpos_dictionary.size())+'; type = '+str(type_dictionary.size())+';')
 
-data_reader, lexicon = conllu_data, None
+data_reader= conllu_data
+lexicon = args.lexicon
 if 'conllul' in args.lexicon:
   from dat import lattice_data
   from dat.lattice_reader import Lattice
@@ -62,20 +73,27 @@ if use_test:
   num_test_data = sum(data_test[1])
   print('# sents in test = %d'%num_test_data)
 punct_set = args.punctuation
-
-word_table = ioutils.construct_word_embedding_table(word_dim, word_dictionary, word_embed)
+print("random init of word vectors set to {} ".format(args.random_init))
+word_table = ioutils.construct_word_embedding_table(word_dim, word_dictionary, word_embed, random_init=args.random_init)
 print('defining model...')
 window = 3
 if 'json' in args.prelstm_args:
   from models.modules.elmo_gp import ElmoGP
-  network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=lexicon, delex=args.delex)
+  _lexicon = False if lexicon == "0" else lexicon
+  print("- elmo gp  ")
+  network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=_lexicon, delex=args.delex)
 else:
+  print("- BiRecurrentConvBiAffine ")
   from models.modules.parser import BiRecurrentConvBiAffine
   network = BiRecurrentConvBiAffine(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True)
 if use_gpu:
   network.cuda()
+#count parameters 
+model_parameters = filter(lambda p: p.requires_grad, network.parameters())
+params = int(sum([np.prod(p.size()) for p in model_parameters]))
+print("Number of trainable parameters {} ".format(params))
 
-train_args.save_train_args(args.dest_path, args, [word_dim, word_dictionary.size(), char_dictionary.size(), pos_dictionary.size(), window, type_dictionary.size(), punct_set, args.decode, args.batch_size, xpos_dictionary.size()])
+train_args.save_train_args(args.dest_path, args, [word_dim, word_dictionary.size(), char_dictionary.size(), pos_dictionary.size(), window, type_dictionary.size(), punct_set, args.decode, args.batch_size, xpos_dictionary.size(), params])
 
 def gen_optim(lr, params):
   params = filter(lambda param: param.requires_grad, params)
@@ -86,7 +104,7 @@ def train():
   train_err, train_err_arc, train_err_type, train_total = 0.0, 0.0, 0.0, 0
   for batch in tqdm(range(1, num_train_batches+1)):
     optimizer.zero_grad()
-    if lexicon!=None:
+    if lexicon!="0":
       word, char, pos, xpos, heads, types, masks, lengths, morph = data_reader.get_batch_variable(data_train, args.batch_size, unk_replace=args.unk_replace)
       loss_arc, loss_type = network.loss(word, char, pos, xpos, heads, types, mask=masks, length=lengths, input_morph=morph)
     else:
@@ -111,7 +129,7 @@ def evaluate_parser(dname, data):
   g_lcorr, g_total = 0.0, 0
   with torch.no_grad():
     for batch in data_reader.iterate_batch_variable(data, args.batch_size):
-      if lexicon!=None:
+      if lexicon!="0":
         word, char, pos, xpos, heads, types, masks, lengths, _, _, morph, _ = batch
         heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=args.decode, input_morph=morph)
       else:

@@ -9,15 +9,15 @@ import torch
 
 from .constants import UNK_ID, DIGIT_RE
 
-def construct_word_embedding_table(word_dim, word_dictionary, word_embed):
+def construct_word_embedding_table(word_dim, word_dictionary, word_embed, random_init=False):
   scale = np.sqrt(3.0 / word_dim)
   table = np.empty([word_dictionary.size(), word_dim], dtype=np.float32)
   table[UNK_ID, :] = np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
   oov = 0
   for word, index in word_dictionary.items():
-    if word in word_embed:
+    if word in word_embed and not random_init:
       embedding = word_embed[word]
-    elif word.lower() in word_embed:
+    elif word.lower() in word_embed and not random_init:
       embedding = word_embed[word.lower()]
     else:
       embedding = np.random.uniform(-scale, scale, [1, word_dim]).astype(np.float32)
@@ -43,12 +43,14 @@ def load_word_embeddings(path, dry_run, content_arr, useful_words=None):
         pbar=tqdm(total=int(tokens[0]) if not dry_run else 100)
         embed_dim = int(tokens[1])
         continue
+      ## --
       if len(tokens)-1==embed_dim:
         word = DIGIT_RE.sub(b"0", str.encode(tokens[0])).decode()
         if word in useful_words:
           embed = np.empty([1, embed_dim], dtype=np.float32)
           embed[:] = tokens[1:]
           embed_dict[word] = embed
+      ## --- 
       li = li + 1
       if li%5==0:
         pbar.update(5)

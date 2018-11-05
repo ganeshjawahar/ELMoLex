@@ -39,6 +39,7 @@ class ElmoGP(nn.Module):
     self.delex = delex
     self.init_lstm = os.path.exists(prelstm_args)
 
+
     dim_enc = 0
     if delex==False:
       dim_enc = word_dim
@@ -250,10 +251,12 @@ class ElmoGP(nn.Module):
     # out_arc shape [batch, length, length]
     out_arc, out_type, mask, length = self.forward(input_word, input_char, input_pos, input_xpos, mask=mask, length=length, hx=hx, input_morph=input_morph)
     batch, max_len, _ = out_arc.size()
-
+    #print("LENGH",length is not None)
+    #print("BATCH ", batch)
     if length is not None and heads.size(1) != mask.size(1):
       heads = heads[:, :max_len]
-      types = types[:, :max_len]
+      types = types[:, :max_len]  
+      
 
     # out_type shape [batch, length, type_space]
     type_h, type_c = out_type
@@ -261,6 +264,8 @@ class ElmoGP(nn.Module):
     # create batch index [batch]
     batch_index = torch.arange(0, batch).type_as(out_arc.data).long()
     # get vector for heads [batch, length, type_space]
+    #print("DEBUG -- ", heads.data.t())
+    #print("--- ---")
     type_h = type_h[batch_index, heads.data.t()].transpose(0, 1).contiguous()
     # compute output for type [batch, length, num_labels]
     out_type = self.bilinear(type_h, type_c)

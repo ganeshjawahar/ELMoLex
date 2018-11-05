@@ -25,3 +25,4 @@ python train.py --word_path sample_run/cc.en.300.vec.sample --train_path sample_
 # predict the parse tree and compute CONLL'18 scores
 python test.py --pred_folder sample_run/parser --system_tb sample_run/en_lines-ud-test_pred.conllu --gold_tb sample_run/gold --tb_out sample_run/en_lines-test-pred.conllu --lexicon sample_run/UDLex_English-Apertium.conllul --word_path sample_run/cc.en.300.vec.sample
 fi
+

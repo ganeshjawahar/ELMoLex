@@ -1,5 +1,5 @@
 import codecs
-
+import sys
 from .ioutils import DependencyInstance, Sentence
 from .constants import DIGIT_RE, MAX_CHAR_LENGTH, NUM_CHAR_PAD, ROOT, ROOT_CHAR, ROOT_POS, ROOT_TYPE, PAD
 
@@ -7,6 +7,7 @@ class CoNLLReader(object):
 
   def __init__(self, file_path, word_dictionary, char_dictionary, pos_dictionary, type_dictionary, xpos_dictionary, lemma_dictionary):
     self.__source_file = codecs.open(file_path, 'r', 'utf-8', errors='ignore')
+    self.__file_path = file_path
     self.__word_dictionary = word_dictionary
     self.__char_dictionary = char_dictionary
     self.__lemma_dictionary = lemma_dictionary
@@ -23,8 +24,12 @@ class CoNLLReader(object):
     line = self.__source_file.readline()
 
     # skip multiple blank lines.
+    raw_text = []
     while len(line) > 0 and (len(line.strip()) == 0 or line.strip()[0]=='#'):
+      if line.strip()[0] == '#':
+        raw_text.append(line)
       line = self.__source_file.readline()
+    
     if len(line) == 0:
       return None
 
@@ -74,8 +79,15 @@ class CoNLLReader(object):
     for tokens in lines:
       if '-' in tokens[0] or '.' in tokens[0]:
         continue
+      if len(tokens)<10:
+        sys.stderr.write("Sentence broken for unkwown reasons \n".format(lines))
+        open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("Line broken {} because of tokens {} from {} file \n ".format(lines, tokens,self.__file_path))        
+        continue
+
       chars = []
-      char_ids = []
+      char_ids = [] 
+      #sys.stderr.write("DEBUG --> tokens ERROR {} \n".format(tokens))
+      #sys.stderr.write("DEBUG --> lines ERROR {} \n".format(lines))
       for char in tokens[1]:
         chars.append(char)
         char_ids.append(self.__char_dictionary.get_index(char))
@@ -85,8 +97,13 @@ class CoNLLReader(object):
       char_seqs.append(chars)
       char_id_seqs.append(char_ids)
 
+      #sys.stderr.write("CHAR FILLED \n")
+
       words.append(tokens[1])
       lemmas.append(tokens[2])
+      #sys.stderr.write("LEMMAS  FILLED \n")
+      
+
       word = DIGIT_RE.sub(b"0", str.encode(tokens[1])).decode()
       word_ids.append(self.__word_dictionary.get_index(word))
       #lemma_ids.append(self.__lemma_dictionary.get_index(tokens[2]))
@@ -114,7 +131,7 @@ class CoNLLReader(object):
       types.append(END_TYPE)
       type_ids.append(self.__type_dictionary.get_index(END_TYPE))
       heads.append(0)
-    return DependencyInstance(Sentence(words, word_ids, char_seqs, char_id_seqs, lines), postags, pos_ids, xpostags, xpos_ids, lemmas, lemma_ids, heads, types, type_ids)
+    return DependencyInstance(Sentence(words, word_ids, char_seqs, char_id_seqs, [lines, raw_text]), postags, pos_ids, xpostags, xpos_ids, lemmas, lemma_ids, heads, types, type_ids)
 
 
 

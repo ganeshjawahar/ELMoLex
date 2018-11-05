@@ -10,6 +10,8 @@ def parse_test_args():
   args_parser.add_argument('--system_tb', type=str, default='/home/ganesh/objects/conll18/udpipe-trained/direct/ud-en_lines/en_lines-ud-eval-ud.conllu', help='Name of the CoNLL-U file with the predicted data.')
   args_parser.add_argument('--gold_tb', type=str, default='/home/ganesh/objects/conll18/udpipe-trained/direct/ud-en_lines/en_lines-ud-eval-gold.conllu', help='Name of the CoNLL-U file with the gold data.')
   args_parser.add_argument('--tb_out', type=str, default='pred_tree.conllu', help='file name for writing the predicted parse tree')
+  args_parser.add_argument('--sosweet', type=bool, default=-0, help='for evaluation purposes : sosweet will use eval07.pl ')
+
 
   # aux
   args_parser.add_argument('--lex_expand', action='store_false', help='should try to expand lexical information from UDLexicons for oov words?')
@@ -25,7 +27,8 @@ def parse_test_args():
 def parse_train_args():
   args_parser = argparse.ArgumentParser(description="ELMoLex Parser - Training")
 
-  args_parser.add_argument('--pos', action='store_false', help='use part-of-speech embedding.')
+  #args_parser.add_argument('--pos', action='store_false', help='use part-of-speech embedding.')
+  args_parser.add_argument('--pos', required=True, type=int, help='use part-of-speech embedding.')
   args_parser.add_argument('--char', action='store_false', help='use character embedding and CNN.')
   args_parser.add_argument('--dry_run', action='store_true', help='run in small scale.')
   args_parser.add_argument('--decode', default='mst', choices=['mst', 'greedy'], help='decoding algorithm')
@@ -38,7 +41,7 @@ def parse_train_args():
   args_parser.add_argument('--pos_dim', type=int, default=100, help='Dimension of POS embeddings')
   args_parser.add_argument('--char_dim', type=int, default=100, help='Dimension of Character embeddings')
 
-  args_parser.add_argument('--num_epochs', type=int, default=1000, help='Number of training epochs')
+  args_parser.add_argument('--num_epochs', type=int, default=100, help='Number of training epochs')
   args_parser.add_argument('--batch_size', type=int, default=32, help='Number of sentences in each batch')
   args_parser.add_argument('--learning_rate', type=float, default=0.001, help='Learning rate')
   args_parser.add_argument('--decay_rate', type=float, default=0.75, help='Decay rate of learning rate')
@@ -63,10 +66,10 @@ def parse_train_args():
   args_parser.add_argument('--prelstm_args', type=str, default='/home/ganesh/objects/neurogp/en_15/nlm/args.json', help='settings file for pre-trained lstm models. leave it empty for no initialization.')
 
   # elmo
-  args_parser.add_argument('--elmo', action='store_false', help='use elmo features? (ensure lstm_dir is present)')
+  args_parser.add_argument('--elmo', required=True,type=int ,help='use elmo features? (ensure lstm_dir is present)')
 
   # lexicon
-  args_parser.add_argument('--lexicon', type=str, default='/home/ganesh/data/conll/UDLexicons.0.2/UDLex_English-Apertium.conllul', help='path to the lexicon')
+  args_parser.add_argument('--lexicon', type=str, default='/home/ganesh/data/conll/UDLexicons.0.2/UDLex_English-Apertium.conllul', help='path to the lexicon, should be equal to 0 as str if not use')
   args_parser.add_argument('--lex_hot', action='store_true', help='use mult-hot vector for representing lexical information')
   args_parser.add_argument('--lex_embed', type=int, default=100, help='embedding dim for representing lexical information. set -1 if you dont want to embed lexical tokens')
   args_parser.add_argument('--lex_attn', type=str, default='Specific', help='what kind of attention to use to combine embeddings? None (Mean) or Specific or Group')
@@ -77,6 +80,9 @@ def parse_train_args():
   # aux
   args_parser.add_argument('--lex_trim', action='store_true', help='trim lexical vocab to keep just words in input set? should try to expand lex in test side if required')
   args_parser.add_argument('--vocab_trim', action='store_true', help='trim word vocab to keep just words in input set? should try to expand word in test side if required')
+
+  args_parser.add_argument('--random_init',type=int, help='discard lexical information?')
+
 
   args =  args_parser.parse_args()
   return args
@@ -116,6 +122,9 @@ def save_train_args(path, args, other_args):
   save_args['delex'] = args.delex
   save_args['lex_trim'] = args.lex_trim
   save_args['vocab_trim'] = args.vocab_trim
+  save_args['random_init'] = args.random_init
+  save_args["n_trainable_params"] = other_args[10]
+
   file_path = os.path.join(path, 'args.json')
   json.dump(save_args, open(file_path, 'w'), indent=4)
   print('saved settings as a json in: '+str(file_path))

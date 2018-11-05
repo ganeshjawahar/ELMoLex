@@ -1,3 +1,5 @@
+ # -*- coding: utf-8 -*-
+
 '''
 Neural Language Modeling for ELMo features - ELMoLex
 '''
@@ -6,6 +8,7 @@ import sys
 import os
 import math
 from tqdm import tqdm
+import numpy as np 
 
 from dat import ioutils, nlm_data
 from models.modules.nlm import NeuralLangModel
@@ -21,7 +24,7 @@ torch.manual_seed(args.seed)
 args = nlm_args.parse_train_args()
 
 use_gpu = torch.cuda.is_available()
-print("GPU found: "+str(use_gpu))
+print("GPU found: !"+str(use_gpu))
 
 print('storing everything in '+str(args.dest_path))
 if not os.path.exists(args.dest_path):
@@ -56,8 +59,11 @@ window = 3
 network = NeuralLangModel(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, delex=args.delex)
 if use_gpu:
   network.cuda()
+model_parameters = filter(lambda p: p.requires_grad, network.parameters())
+params = int(sum([np.prod(p.size()) for p in model_parameters]))
+print("Number of trainable parameters {} ".format(params))
 
-nlm_args.save_train_args(args.dest_path, args, [word_dim, word_dictionary.size(), char_dictionary.size(), pos_dictionary.size(), window, args.batch_size, xpos_dictionary.size()])
+nlm_args.save_train_args(args.dest_path, args, [word_dim, word_dictionary.size(), char_dictionary.size(), pos_dictionary.size(), window, args.batch_size, xpos_dictionary.size(), params])
 
 def gen_optim(lr, params):
   params = filter(lambda param: param.requires_grad, params)

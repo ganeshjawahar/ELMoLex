@@ -218,8 +218,13 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       tid_inputs[i, :inst_size] = tids
       tid_inputs[i, inst_size:] = PAD_ID_TAG
       # heads
-      hid_inputs[i, :inst_size] = hids
-      hid_inputs[i, inst_size:] = PAD_ID_TAG
+      ONLY_PRED = True
+      if not ONLY_PRED:
+        hid_inputs[i, :inst_size] = hids
+        hid_inputs[i, inst_size:] = PAD_ID_TAG
+      #else:
+      #  hid_inputs[i, :0] = None
+      #  hid_inputs[i, inst_size:] = None
       # masks
       masks_inputs[i, :inst_size] = 1.0
       for j, wid in enumerate(wids):

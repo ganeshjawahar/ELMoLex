@@ -134,8 +134,16 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       tid_inputs[i, :inst_size] = tids
       tid_inputs[i, inst_size:] = PAD_ID_TAG
       # heads
-      hid_inputs[i, :inst_size] = hids
-      hid_inputs[i, inst_size:] = PAD_ID_TAG
+      if True: 
+      # WAD FOUND FALSE when got back !! 
+      ## REALY ??
+      ## TURN TO TRUE for ablation_study again (end of October )
+      # we do that in the ONLY_PRED==True because 
+        #print("DEBUG--> is true ")
+        hid_inputs[i, :inst_size] = hids
+        hid_inputs[i, inst_size:] = PAD_ID_TAG
+      #else:
+        #print("DEBUG --> hids set to False ")
       # masks
       masks_inputs[i, :inst_size] = 1.0
       for j, wid in enumerate(wids):

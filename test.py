@@ -1,3 +1,5 @@
+ # -*- coding: utf-8 -*-
+
 '''
 ELMoLex parser - testing
 '''
@@ -17,6 +19,9 @@ import torch
 
 from misc.conll18_ud_eval import load_conllu_file, evaluate
 
+# TODO (very ugly) so meant to be cleaned ! 
+ONLY_PRED = True 
+print("WARNING : ONLY_PRED IS {}".format(ONLY_PRED))
 args = test_args.parse_test_args()
 
 pred_trees_path = os.path.join(args.pred_folder, 'pred_trees')
@@ -28,7 +33,6 @@ if os.path.exists(tb_out_path):
   print('%s already exists. So over-writing it.'%(tb_out_path))
 
 use_gpu = False
-
 print('loading dictionaries...')
 dict_folder = os.path.join(args.pred_folder, 'dict')
 word_dictionary = Dictionary('word', default_value=True, singleton=True)
@@ -56,21 +60,24 @@ if 'conllul' in train_args['lexicon']:
   from dat.lattice_reader import Lattice
   data_reader = lattice_data
   lexicon = pickle.load(open(os.path.join(args.pred_folder, 'dict', 'lexicon.pkl'), 'rb'))
-  if args.lex_expand:
-    oov_test_words = ioutils.getOOVWords(word_dictionary, args.gold_tb)
-    print('adding lexical info for %d oov words'%(len(oov_test_words)))
-    lexicon[0].addFeaturesForOOVWords(oov_test_words, args.lexicon)
+  #TODO : set it to False 
+  if not ONLY_PRED:
+    if args.lex_expand:
+      oov_test_words = ioutils.getOOVWords(word_dictionary, args.gold_tb)
+      print('adding lexical info for %d oov words'%(len(oov_test_words)))
+      lexicon[0].addFeaturesForOOVWords(oov_test_words, args.lexicon)
 
 oov_embed_dict = None
-if args.vocab_expand:
-  oov_test_words = ioutils.getOOVWords(word_dictionary, args.system_tb)
-  print('adding word embedding info for %d oov words'%(len(oov_test_words)))
-  oov_embed_dict, embed_dim = ioutils.load_word_embeddings(args.word_path, False, None, oov_test_words)
-  for oov_word in oov_embed_dict:
-    oov_embed_dict[oov_word] = torch.from_numpy(oov_embed_dict[oov_word])
-  assert(train_args['word_dim']==embed_dim)
-  print('word embeddings for %d/%d oov words fetched'%(len(oov_embed_dict), len(oov_test_words)))
-
+if not ONLY_PRED:
+  if args.vocab_expand:
+    # TODO = offset for elmolex_sosweet prediction
+    oov_test_words = ioutils.getOOVWords(word_dictionary, args.system_tb)
+    print('adding word embedding info for %d oov words'%(len(oov_test_words)))
+    oov_embed_dict, embed_dim = ioutils.load_word_embeddings(args.word_path, False, None, oov_test_words)
+    for oov_word in oov_embed_dict:
+      oov_embed_dict[oov_word] = torch.from_numpy(oov_embed_dict[oov_word])
+    assert(train_args['word_dim']==embed_dim)
+    print('word embeddings for %d/%d oov words fetched'%(len(oov_embed_dict), len(oov_test_words)))
 data_test = data_reader.read_data_to_variable(args.system_tb, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, use_gpu=use_gpu, volatile=True, symbolic_root=True, dry_run=False, lattice=lexicon)
 num_test_data = sum(data_test[1])
 print('No. of sentences (system_tb) = %d'%(num_test_data))
@@ -112,28 +119,37 @@ with torch.no_grad():
     lengths = lengths.cpu().numpy()
     heads = heads.data.cpu().numpy()
     types = types.data.cpu().numpy()
-    stats, num_inst = network.compute_las(word, pos, heads_pred, types_pred, heads, types, word_dictionary, pos_dictionary, lengths, punct_set=train_args['punct_set'], symbolic_root=True)
-    ucorr, lcorr, total, ucm, lcm = stats
-    g_lcorr+=lcorr
-    g_total+=total
+    if not ONLY_PRED:
+      stats, num_inst = network.compute_las(word, pos, heads_pred, types_pred, heads, types, word_dictionary, pos_dictionary, lengths, punct_set=train_args['punct_set'], symbolic_root=True)
+      ucorr, lcorr, total, ucm, lcm = stats
+      g_lcorr+=lcorr
+      g_total+=total
     pred_writer.store_buffer(word, pos, heads_pred, types_pred, lengths, order_ids, raw_words, raw_lines, symbolic_root=True)
 pred_writer.write_buffer()
 pred_writer.close()  
-print('test las: %.4f'%(g_lcorr/g_total))
+if not ONLY_PRED:
+  print('test las: %.4f'%(g_lcorr/g_total))
+  conllu_18_eval = True
+  if args.sosweet is not None: 
+    if args.sosweet:
+      conllu_18_eval = False
+  if conllu_18_eval:
+    print('computing CONLL-18 scores...')
+    gold_out = load_conllu_file(args.gold_tb)
+    our_out = load_conllu_file(tb_out_path)
+    ud_out = load_conllu_file(args.system_tb)
+    our_score = evaluate(gold_out, our_out)
+    ud_score = evaluate(gold_out, ud_out)
+    def per_diff(num1, num2):
+      if num1==0.0:
+        return num1
+      return ((num2-num1)/num1)
+    print("LAS F1 Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["LAS"].f1, 100*our_score["LAS"].f1, 100*(our_score["LAS"].f1-ud_score["LAS"].f1), 100*per_diff(ud_score["LAS"].f1, our_score["LAS"].f1)))
+    print("MLAS Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["MLAS"].f1, 100*our_score["MLAS"].f1, 100*(our_score["MLAS"].f1-ud_score["MLAS"].f1), 100*per_diff(ud_score["MLAS"].f1, our_score["MLAS"].f1)))
+    print("BLEX Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["BLEX"].f1, 100*our_score["BLEX"].f1, 100*(our_score["BLEX"].f1-ud_score["BLEX"].f1), 100*per_diff(ud_score["BLEX"].f1, our_score["BLEX"].f1)))
 
-print('computing CONLL-18 scores...')
-gold_out = load_conllu_file(args.gold_tb)
-our_out = load_conllu_file(tb_out_path)
-ud_out = load_conllu_file(args.system_tb)
-our_score = evaluate(gold_out, our_out)
-ud_score = evaluate(gold_out, ud_out)
-def per_diff(num1, num2):
-  if num1==0.0:
-    return num1
-  return ((num2-num1)/num1)
-print("LAS F1 Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["LAS"].f1, 100*our_score["LAS"].f1, 100*(our_score["LAS"].f1-ud_score["LAS"].f1), 100*per_diff(ud_score["LAS"].f1, our_score["LAS"].f1)))
-print("MLAS Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["MLAS"].f1, 100*our_score["MLAS"].f1, 100*(our_score["MLAS"].f1-ud_score["MLAS"].f1), 100*per_diff(ud_score["MLAS"].f1, our_score["MLAS"].f1)))
-print("BLEX Score: {:.2f} (ud), {:.2f} (ours), diff {:.2f} {:.2f}%".format(100*ud_score["BLEX"].f1, 100*our_score["BLEX"].f1, 100*(our_score["BLEX"].f1-ud_score["BLEX"].f1), 100*per_diff(ud_score["BLEX"].f1, our_score["BLEX"].f1)))
+  else:
+    print("Adding evaluation eval07")
 
-
-
+print("PREDICTION DONE {} pred_folder {} tb_out ".format(args.pred_folder,args.tb_out ))
+open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("PREDICTION DONE {} pred_folder {} tb_out \n ".format(args.pred_folder,args.tb_out))
