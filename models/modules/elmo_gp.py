@@ -20,7 +20,8 @@ from ..functions.mst import mst
 class ElmoGP(nn.Module):
   def __init__(self, word_dim, num_words, char_dim, num_chars, pos_dim, num_pos, num_xpos, num_filters, kernel_size, hidden_size, num_layers, num_labels, arc_space, type_space, embed_word=None, p_in=0.33, p_out=0.33, p_rnn=(0.33, 0.33), biaffine=True, pos=True, char=True, init_emb=False, prelstm_args=None, elmo=False, lattice=None, delex=False):
     super(ElmoGP, self).__init__()
-
+    if predict_pos:
+      assert not pos, "ERROR "
     self.word_embed = nn.Embedding(num_words, word_dim) if delex==False else None
     self.pos_embed = nn.Embedding(num_pos, pos_dim) if pos else None 
     self.xpos_embed = nn.Embedding(num_xpos, pos_dim) if pos else None
@@ -38,6 +39,7 @@ class ElmoGP(nn.Module):
     self.lattice = lattice
     self.delex = delex
     self.init_lstm = os.path.exists(prelstm_args)
+    self.predict_pos = predict_pos 
 
 
     dim_enc = 0
@@ -57,6 +59,12 @@ class ElmoGP(nn.Module):
         dim_enc += lattice[2]
     print('word feature size = %d'%(dim_enc))
 
+    #--
+    #if self.predict_pos and False :
+    #  pos_space = 10
+    #  self.head_pos = nn.Linear(out_dim, pos_space)
+      # add drop out
+    #--
     self.rnn = VarMaskedFastLSTM(dim_enc, hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True, dropout=p_rnn)
 
     out_dim = hidden_size * 2
@@ -224,6 +232,10 @@ class ElmoGP(nn.Module):
     # output size [batch, length, type_space]
     type_h = F.elu(self.type_h(output))
     type_c = F.elu(self.type_c(output))
+
+    #--
+    #pos_c = F.elu(self.head_pos(output))
+    #--
 
     # apply dropout
     # [batch, length, dim] --> [batch, 2 * length, dim]
