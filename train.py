@@ -77,15 +77,12 @@ print("random init of word vectors set to {} ".format(args.random_init))
 word_table = ioutils.construct_word_embedding_table(word_dim, word_dictionary, word_embed, random_init=args.random_init)
 print('defining model...')
 window = 3
-if 'json' in args.prelstm_args:
-  from models.modules.elmo_gp import ElmoGP
-  _lexicon = False if lexicon == "0" else lexicon
-  print("- elmo gp  ")
-  network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=_lexicon, delex=args.delex)
-else:
-  print("- BiRecurrentConvBiAffine ")
-  from models.modules.parser import BiRecurrentConvBiAffine
-  network = BiRecurrentConvBiAffine(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True)
+print("Warning : forced to use it ")
+from models.modules.elmo_gp import ElmoGP
+_lexicon = False if lexicon == "0" else lexicon
+print("- elmo gp  ")
+#network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=_lexicon, delex=args.delex)
+network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=lexicon, delex=args.delex, word_dictionary=word_dictionary, char_dictionary=char_dictionary, use_gpu=use_gpu)
 if use_gpu:
   network.cuda()
 #count parameters 
@@ -108,8 +105,9 @@ def train():
       word, char, pos, xpos, heads, types, masks, lengths, morph = data_reader.get_batch_variable(data_train, args.batch_size, unk_replace=args.unk_replace)
       loss_arc, loss_type = network.loss(word, char, pos, xpos, heads, types, mask=masks, length=lengths, input_morph=morph)
     else:
+      #print("--> masks " , masks)
       word, char, pos, xpos, heads, types, masks, lengths, order_inputs = data_reader.get_batch_variable(data_train, args.batch_size, unk_replace=args.unk_replace)
-      loss_arc, loss_type = network.loss(word, char, pos, xpos, heads, types, mask=masks, length=lengths)
+      loss_arc, loss_type = network.loss(word, char, pos, xpos, heads=heads, types=types, mask=masks, length=lengths)
     loss = loss_arc + loss_type
     loss.backward()
     clip_grad_norm(network.parameters(), clip)

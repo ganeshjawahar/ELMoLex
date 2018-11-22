@@ -5,14 +5,21 @@ import os
 from .constants import MAX_CHAR_LENGTH, NUM_CHAR_PAD, PAD_CHAR, PAD_POS, PAD_TYPE, ROOT_CHAR, ROOT_POS, ROOT_TYPE, END_CHAR, END_POS, END_TYPE, _START_VOCAB, ROOT, PAD_ID_WORD, PAD_ID_CHAR, PAD_ID_TAG, DIGIT_RE
 from .conllu_reader import CoNLLReader
 from .dictionary import Dictionary
-
 import numpy as np
 np.random.seed(123)
 import torch
 torch.manual_seed(123)
 from torch.autograd import Variable
 
+
 def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry_run, vocab_trim=False):
+  """
+  Given train, dev, test treebanks and a word embedding matrix :
+  - basic mode : create key_value instanes for each CHAR, WORD, U|X-POS , Relation with special cases for Roots, Padding and End symbols
+  - expanding is done on dev set (we assume that dev set is accessible)
+  - if vocab_trim == False : we also perform expansion on test set
+  check TODOs
+  """
   word_dictionary = Dictionary('word', default_value=True, singleton=True)
   char_dictionary = Dictionary('character', default_value=True)
   pos_dictionary = Dictionary('pos', default_value=True)
@@ -34,7 +41,7 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
   xpos_dictionary.add(END_POS)
   type_dictionary.add(END_TYPE)
 
-  vocab = dict()
+  vocab = dict() # what is it for ? TODO : cleaning
   with codecs.open(train_path, 'r', 'utf-8', errors='ignore') as file:
     li = 0
     for line in file:
@@ -72,7 +79,7 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
   # if a singleton is in pretrained embedding dict, set the count to min_occur + c
   for word in vocab.keys():
     if word in word_embed_dict or word.lower() in word_embed_dict:
-      vocab[word] += 1
+      vocab[word] += 1 # TODO : are you sure ? Why not + min_occurence ??
 
   vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
   vocab_list = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurence]
@@ -122,21 +129,31 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
     word_dictionary.add(word)
     if word in singletons:
       word_dictionary.add_singleton(word_dictionary.get_index(word))
+
   word_dictionary.save(dict_path)
   char_dictionary.save(dict_path)
   pos_dictionary.save(dict_path)
   xpos_dictionary.save(dict_path)
   type_dictionary.save(dict_path)
-
   word_dictionary.close()
   char_dictionary.close()
   pos_dictionary.close()
   xpos_dictionary.close()
   type_dictionary.close()
+
   return word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary
 
-def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False, symbolic_end=False, dry_run=False):
+
+def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary,
+              max_size=None, normalize_digits=True,
+              symbolic_root=False, symbolic_end=False, dry_run=False):
+  """
+  Given vocabularies , data_file :
+  - creates a  list of bucket
+  - each bucket is a list of unicode encoded worrds, character, pos tags, relations, ... based on DependancyInstances() and Sentence() objects
+  """
   _buckets = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, -1]
+
   last_bucket_id = len(_buckets) - 1
   data = [[] for _ in _buckets]
   max_char_length = [0 for _ in _buckets]
@@ -144,6 +161,7 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
   counter = 0
   reader = CoNLLReader(source_path, word_dictionary, char_dictionary, pos_dictionary, type_dictionary, xpos_dictionary, None)
   inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
+
   while inst is not None and (not dry_run or counter < 100):
     inst_size = inst.length()
     sent = inst.sentence
@@ -159,10 +177,14 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
     inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
     counter += 1
   reader.close()
+
   return data, max_char_length, _buckets
 
 
 def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False, symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None):
+  """
+  Given data ovject form read_variable creates array-like  variables for character, word, pos, relation, heads ready to be fed to a network
+  """
   data, max_char_length, _buckets = read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, max_size=max_size, normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end, dry_run=dry_run)
   bucket_sizes = [len(data[b]) for b in range(len(_buckets))]
 
@@ -255,6 +277,9 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
   return data_variable, bucket_sizes, _buckets
 
 def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
+  """
+  Given read_data_to_variable() get a random batch
+  """
   data_variable, bucket_sizes, _buckets = data
   total_size = float(sum(bucket_sizes))
   # A bucket scale is a list of increasing numbers from 0 to 1 that we'll use
@@ -286,6 +311,9 @@ def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
   return words, chars[index], pos[index], xpos[index], heads[index], types[index], masks[index], lengths[index], order_inputs[index]
 
 def iterate_batch_variable(data, batch_size, unk_replace=0., lattice=None):
+  """
+  Iterate over the dataset based on read_data_to_variable() object (used a evaluation)
+  """
   data_variable, bucket_sizes, _buckets = data
   bucket_indices = np.arange(len(_buckets))
 

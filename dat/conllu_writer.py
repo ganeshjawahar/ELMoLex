@@ -56,7 +56,7 @@ class CoNLLWriter(object):
         if len(ud_tokens)<9:
           sys.stderr.write("Exception writing lines {} of raw_lines {} of written file {} \n".format(ud_tokens, raw_lines[1],self.__file_path))
           open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("Line broken {} on raw_lines {} of writted file  {} \n ".format(ud_tokens, raw_lines[1],self.__file_path))        
-          continue 
+            continue 
         idi, form, lemma, upos, xpos, feats, head, deprel, deps, misc = ud_tokens  
         if '-' not in idi and '.' not in idi:
         #if '-' not in idi:
