@@ -66,9 +66,9 @@ punct_set = args.punctuation
 word_table = ioutils.construct_word_embedding_table(word_dim, word_dictionary, word_embed)
 print('defining model...')
 window = 3
-if 'json' in args.prelstm_args:
+if os.path.exists(args.prelstm_args):
   from models.modules.elmo_gp import ElmoGP
-  network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=lexicon, delex=args.delex)
+  network = ElmoGP(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), xpos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True, prelstm_args=args.prelstm_args, elmo=args.elmo, lattice=lexicon, delex=args.delex, word_dictionary=word_dictionary, char_dictionary=char_dictionary, use_gpu=use_gpu)
 else:
   from models.modules.parser import BiRecurrentConvBiAffine
   network = BiRecurrentConvBiAffine(word_dim, word_dictionary.size(), args.char_dim, char_dictionary.size(), args.pos_dim, pos_dictionary.size(), args.num_filters, window, args.hidden_size, args.num_layers, type_dictionary.size(), args.arc_space, args.type_space, embed_word=word_table, pos=args.pos, char=args.char, init_emb=True)

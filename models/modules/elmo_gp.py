@@ -17,14 +17,17 @@ from .attention import BiAttention
 from .elmo import Elmo
 from ..functions.mst import mst
 
+from allennlp.modules.elmo import Elmo, batch_to_ids
+
 class ElmoGP(nn.Module):
-  def __init__(self, word_dim, num_words, char_dim, num_chars, pos_dim, num_pos, num_xpos, num_filters, kernel_size, hidden_size, num_layers, num_labels, arc_space, type_space, embed_word=None, p_in=0.33, p_out=0.33, p_rnn=(0.33, 0.33), biaffine=True, pos=True, char=True, init_emb=False, prelstm_args=None, elmo=False, lattice=None, delex=False):
+  def __init__(self, word_dim, num_words, char_dim, num_chars, pos_dim, num_pos, num_xpos, num_filters, kernel_size, hidden_size, num_layers, num_labels, arc_space, type_space, embed_word=None, p_in=0.33, p_out=0.33, p_rnn=(0.33, 0.33), biaffine=True, pos=True, char=True, init_emb=False, prelstm_args=None, elmo=False, lattice=None, delex=False, word_dictionary=None, char_dictionary=None, use_gpu=False):
     super(ElmoGP, self).__init__()
 
     self.word_embed = nn.Embedding(num_words, word_dim) if delex==False else None
     self.pos_embed = nn.Embedding(num_pos, pos_dim) if pos else None 
     self.xpos_embed = nn.Embedding(num_xpos, pos_dim) if pos else None
     self.char_embed = nn.Embedding(num_words, char_dim) if delex==False and char else None
+    self.word_dictionary = word_dictionary
 
     self.conv1d = nn.Conv1d(char_dim, num_filters, kernel_size, padding=kernel_size - 1) if delex==False and char else None
     self.dropout_in = nn.Dropout2d(p=p_in)
@@ -38,6 +41,7 @@ class ElmoGP(nn.Module):
     self.lattice = lattice
     self.delex = delex
     self.init_lstm = os.path.exists(prelstm_args)
+    self.use_gpu = use_gpu
 
     dim_enc = 0
     if delex==False:
@@ -47,7 +51,15 @@ class ElmoGP(nn.Module):
     if delex==False and self.char:
       dim_enc += num_filters
     if self.elmo_use:
-      self.prelstm_args = json.load(open(os.path.join(prelstm_args)))
+      self.prelstm_args = None
+      if prelstm_args.endswith('hdf5'):
+        self.prelstm_args = {}
+        self.prelstm_args['hidden_size'] = 512
+        self.prelstm_args['num_layers'] = 1
+        self.prelstm_args['type'] = 'allen'
+      else:
+        self.prelstm_args = json.load(open(prelstm_args))
+        self.prelstm_args['type'] = 'inhouse'
       dim_enc += 2*self.prelstm_args['hidden_size']
     if lattice:
       if lattice[1]:
@@ -80,12 +92,17 @@ class ElmoGP(nn.Module):
     #if self.init_lstm:
     #  self.initialize_lstm(prelstm_args[0:prelstm_args.rfind('/')])
     if self.elmo_use:
-      print('launching elmo layers...')
-      self.elmo = Elmo(prelstm_args, p_rnn, kernel_size, p_in)
-      self.scalar_parameters = ParameterList([Parameter(torch.FloatTensor([0.0])) for _ in range(self.num_layers+1)])
-      self.gamma = Parameter(torch.FloatTensor([1.0]))
-      for param in self.elmo.parameters():
-        param.requires_grad = False
+      print('launching elmo layers from %s'%prelstm_args)
+      if prelstm_args.endswith('hdf5'):
+        options_file = prelstm_args[0:prelstm_args.rfind("/")+1] + "options.json"
+        self.elmo = Elmo(options_file, prelstm_args, 1, dropout=p_in) # add scalar_mix_parameters=[1,1,1] to do unweighted average of different layers
+      else:
+        self.elmo = Elmo(prelstm_args, p_rnn, kernel_size, p_in, word_dictionary, char_dictionary)
+      if not prelstm_args.endswith('hdf5'):
+        self.scalar_parameters = ParameterList([Parameter(torch.FloatTensor([0.0])) for _ in range(self.num_layers+1)])
+        self.gamma = Parameter(torch.FloatTensor([1.0]))
+        for param in self.elmo.parameters():
+          param.requires_grad = False
 
   def initialize_embed(self, embed_word, pos_dim, char_dim):
     if self.delex==False:
@@ -162,15 +179,38 @@ class ElmoGP(nn.Module):
       features.append(pos)
 
     if self.elmo_use:
-      hid, word = self.elmo(input_word, input_char, input_pos, mask, length, hx)
-      hid = torch.stack(hid)
-      hid = hid.view(-1, word.size(1), self.prelstm_args['hidden_size']*2, self.prelstm_args['num_layers'])
-      elmo_embed = torch.cat([hid, word.unsqueeze(3)], dim=3)
-      normed_weights = torch.nn.functional.softmax(torch.cat([parameter for parameter in self.scalar_parameters]), dim=0)
-      layer_sum = torch.matmul(elmo_embed, normed_weights.unsqueeze(1))*self.gamma
-      layer_sum = layer_sum.squeeze(3)
-      layer_sum = self.dropout_in(layer_sum)
-      features.append(layer_sum)
+      if self.prelstm_args['type'] == 'allen':
+        sentences, elmo_embed = [], None
+        max_v, max_id = length.max(0)
+        for bi in range(input_word.size(0)):
+          sent = []
+          for wi in range(input_word.size(1)):
+            if input_word[bi][wi]==0:
+              sent.append("<<unk>>")
+            elif input_word[bi][wi]==2:
+              sent.append(".")
+            elif input_word[bi][wi]>2:
+              sent.append(self.word_dictionary.get_instance(input_word[bi][wi]).replace(' ', '_'))
+          if max_id.item() == bi:
+            num_pads = input_word.size(1) - len(sent)
+            for pi in range(num_pads):
+              sent.append(".") # adding to account for 1 extra pad per every instance
+          sentences.append(sent)
+        character_ids = batch_to_ids(sentences)
+        if self.use_gpu:
+          character_ids = character_ids.cuda()
+        elmo_embed = self.elmo(character_ids)["elmo_representations"][0]
+        features.append(elmo_embed)
+      else:
+        hid, word = self.elmo(input_word, input_char, input_pos, mask, length, hx)
+        hid = torch.stack(hid)
+        hid = hid.view(-1, word.size(1), self.prelstm_args['hidden_size']*2, self.prelstm_args['num_layers'])
+        elmo_embed = torch.cat([hid, word.unsqueeze(3)], dim=3)
+        normed_weights = torch.nn.functional.softmax(torch.cat([parameter for parameter in self.scalar_parameters]), dim=0)
+        layer_sum = torch.matmul(elmo_embed, normed_weights.unsqueeze(1))*self.gamma
+        layer_sum = layer_sum.squeeze(3)
+        layer_sum = self.dropout_in(layer_sum)
+        features.append(layer_sum)
 
     if self.lattice:
       if self.lattice[1]:

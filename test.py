@@ -75,9 +75,9 @@ data_test = data_reader.read_data_to_variable(args.system_tb, word_dictionary, c
 num_test_data = sum(data_test[1])
 print('No. of sentences (system_tb) = %d'%(num_test_data))
 
-if 'json' in train_args['prelstm_args']:
+if os.path.exists(train_args['prelstm_args']):
   from models.modules.elmo_gp import ElmoGP
-  network = ElmoGP(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), xpos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'], init_emb=False, prelstm_args=train_args['prelstm_args'], elmo=train_args['elmo'], lattice=lexicon, delex=train_args['delex'])
+  network = ElmoGP(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), xpos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'], init_emb=False, prelstm_args=train_args['prelstm_args'], elmo=train_args['elmo'], lattice=lexicon, delex=train_args['delex'], word_dictionary=word_dictionary, char_dictionary=char_dictionary, use_gpu=use_gpu)
 else:
   from models.modules.parser import BiRecurrentConvBiAffine
   network = BiRecurrentConvBiAffine(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'])

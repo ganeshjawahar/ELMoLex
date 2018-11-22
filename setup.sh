@@ -5,3 +5,4 @@ conda install pytorch torchvision cuda90 -c pytorch
 conda install tqdm
 conda install networkx
 conda install xlwt
+pip install allennlp
