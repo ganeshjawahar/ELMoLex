@@ -47,15 +47,41 @@ def VarFastLSTMCell(input, hidden, w_ih, w_hh, b_ih=None, b_hh=None, noise_in=No
         input = input * noise_in
 
     if input.is_cuda:
+        print("DEBUG, tupe VarFastKMST", input.type(), w_ih.type())
+        input = input.type(torch.cuda.FloatTensor)
+        print("DEBUG, hidden[0].type()", hidden[0].type())
+        
+        noise_hidden = None
+        b_ih = None 
+        _hidden_0 = hidden[0].type(torch.cuda.FloatTensor)
         igates = F.linear(input, w_ih)
-        hgates = F.linear(hidden[0], w_hh) if noise_hidden is None else F.linear(hidden[0] * noise_hidden, w_hh)
+        hgates = F.linear(_hidden_0, w_hh) if noise_hidden is None else F.linear(_hidden_0 * noise_hidden, w_hh)
         state = fusedBackend.LSTMFused.apply
         return state(igates, hgates, hidden[1]) if b_ih is None else state(igates, hgates, hidden[1], b_ih, b_hh)
 
     hx, cx = hidden
     if noise_hidden is not None:
         hx = hx * noise_hidden
-    gates = F.linear(input, w_ih, b_ih) + F.linear(hx, w_hh, b_hh)
+    print("DEBUG", w_ih.type())
+    #w_ih = w_ih.type(torch.LongTensor)
+    #hx = hx.type(torch.LongTensor)
+    #w_hh = w_hh.type(torch.LongTensor)
+    #w_ih = w_ih.type(torch.LongTensor)
+    #b_hh = b_hh.type(torch.LongTensor)
+    #b_ih = b_ih.type(torch.LongTensor)
+    #input = input.type(torch.LongTensor)
+    #print("DEBUG2", w_ih.type())
+    print("DEBUG hx ", hx.type())
+    print("DEBUG w_ih ", w_hh.type())
+    print("DEBUG hx ", w_ih.type())
+    print("DEBUG bhh ", b_hh.type())
+    print("DEBUG b_ih ", b_ih.type())
+    print("DEBUG input", input.type())
+    input = input.type(torch.FloatTensor)
+    hx = hx.type(torch.FloatTensor)
+    cx = cx.type(torch.FloatTensor)
+    gates = F.linear(input, w_ih, b_ih) 
+    gates = gates +  F.linear(hx, w_hh, b_hh)
 
     ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
 
@@ -118,14 +144,16 @@ def VarMaskedRecurrent(reverse=False):
             if mask is None or mask[i].data.min() > 0.5:
                 hidden = cell(input[i], hidden)
             elif mask[i].data.max() > 0.5:
+                print("type mask ", mask[i].type())
+                #_mask_i = mask[i].type(torch.FloatTensor)
                 hidden_next = cell(input[i], hidden)
                 # hack to handle LSTM
                 if isinstance(hidden, tuple):
                     hx, cx = hidden
                     hp1, cp1 = hidden_next
-                    hidden = (hx + (hp1 - hx) * mask[i], cx + (cp1 - cx) * mask[i])
+                    hidden = (hx + (hp1 - hx) *  mask[i], cx + (cp1 - cx) *  mask[i])
                 else:
-                    hidden = hidden + (hidden_next - hidden) * mask[i]
+                    hidden = hidden + (hidden_next - hidden) *  mask[i]
             # hack to handle LSTM
             output.append(hidden[0] if isinstance(hidden, tuple) else hidden)
 

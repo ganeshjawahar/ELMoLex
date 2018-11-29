@@ -240,7 +240,8 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       tid_inputs[i, :inst_size] = tids
       tid_inputs[i, inst_size:] = PAD_ID_TAG
       # heads
-      ONLY_PRED = True
+      ONLY_PRED = False
+      #print("WARNING : ONLY_PRED set to {} ".format(ONLY_PRED))
       if not ONLY_PRED:
         hid_inputs[i, :inst_size] = hids
         hid_inputs[i, inst_size:] = PAD_ID_TAG

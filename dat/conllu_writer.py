@@ -36,7 +36,6 @@ class CoNLLWriter(object):
     for seq_no in range(len(self.__out_data)):
       sent_tokens, raw_lines = self.__out_data[seq_no]
       cur_ti = 0
-      #self.__source_file.write("TEST--------- \n")
       is_id = 0
       for ind, raw_row in enumerate(raw_lines[1]):
         if raw_row.startswith('# text = "id":'):
@@ -44,7 +43,6 @@ class CoNLLWriter(object):
           ind_id = ind 
 
       if is_id:
-        
         tweet_id_written = "# tweet_id ="+ raw_lines[1][ind_id][8:].strip()+"\n"
         self.__source_file.write(tweet_id_written)
         #self.__source_file.write(raw_lines[1][ind_id].strip()+"\n")
@@ -52,12 +50,18 @@ class CoNLLWriter(object):
       else:
         for ind, raw_row in enumerate(raw_lines[1]):
           self.__source_file.write(raw_row.strip()+"\n")
+
       for ud_tokens in raw_lines[0]:
-        if len(ud_tokens)<9:
-          sys.stderr.write("Exception writing lines {} of raw_lines {} of written file {} \n".format(ud_tokens, raw_lines[1],self.__file_path))
-          open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("Line broken {} on raw_lines {} of writted file  {} \n ".format(ud_tokens, raw_lines[1],self.__file_path))        
-            continue 
+        if len(ud_tokens)<=9:
+          try:
+            catch_error = "/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt"
+            open(catch_error,"a").write("Line broken {} on raw_lines {} of writted file  {} \n ".format(ud_tokens, raw_lines[1],self.__file_path))        
+          except:
+            print("WARNING ; coulnd not write to {} ".format(catch_error))
+            print("Line broken {} on raw_lines {} of writted file  {} \n ".format(ud_tokens, raw_lines[1],self.__file_path))        
+          continue 
         idi, form, lemma, upos, xpos, feats, head, deprel, deps, misc = ud_tokens  
+
         if '-' not in idi and '.' not in idi:
         #if '-' not in idi:
           cur_model_tokens = sent_tokens[cur_ti]

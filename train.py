@@ -132,6 +132,7 @@ def evaluate_parser(dname, data):
         heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=args.decode, input_morph=morph)
       else:
         word, char, pos, xpos, heads, types, masks, lengths, order_ids, _, _ = batch
+        
         heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=args.decode)
       word = word.data.cpu().numpy()
       pos = pos.data.cpu().numpy()

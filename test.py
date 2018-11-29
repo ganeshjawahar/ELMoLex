@@ -20,7 +20,7 @@ import torch
 from misc.conll18_ud_eval import load_conllu_file, evaluate
 
 # TODO (very ugly) so meant to be cleaned ! 
-ONLY_PRED = True 
+ONLY_PRED = False  
 print("WARNING : ONLY_PRED IS {}".format(ONLY_PRED))
 args = test_args.parse_test_args()
 
@@ -31,7 +31,6 @@ if not os.path.exists(pred_trees_path):
 tb_out_path = os.path.join(args.pred_folder, 'pred_trees', args.tb_out) if args.tb_out == 'pred_tree.conllu' else args.tb_out
 if os.path.exists(tb_out_path):
   print('%s already exists. So over-writing it.'%(tb_out_path))
-
 use_gpu = False
 print('loading dictionaries...')
 dict_folder = os.path.join(args.pred_folder, 'dict')
@@ -82,21 +81,15 @@ data_test = data_reader.read_data_to_variable(args.system_tb, word_dictionary, c
 num_test_data = sum(data_test[1])
 print('No. of sentences (system_tb) = %d'%(num_test_data))
 
-#if 'json' in train_args['prelstm_args']:
-#  from models.modules.elmo_gp import ElmoGP
-#  network = ElmoGP(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), xpos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'], init_emb=False, prelstm_args=train_args['prelstm_args'], elmo=train_args['elmo'], lattice=lexicon, delex=train_args['delex'])
-if os.path.exists(train_args['prelstm_args']):
-  from models.modules.elmo_gp import ElmoGP
-  network = ElmoGP(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), xpos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'], init_emb=False, prelstm_args=train_args['prelstm_args'], elmo=train_args['elmo'], lattice=lexicon, delex=train_args['delex'], word_dictionary=word_dictionary, char_dictionary=char_dictionary, use_gpu=use_gpu)
-else:
-  from models.modules.parser import BiRecurrentConvBiAffine
-  network = BiRecurrentConvBiAffine(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'])
+from models.modules.elmo_gp import ElmoGP
+network = ElmoGP(train_args['word_dim'], word_dictionary.size(), train_args['char_dim'], char_dictionary.size(), train_args['pos_dim'], pos_dictionary.size(), xpos_dictionary.size(), train_args['num_filters'], train_args['window'], train_args['hidden_size'], train_args['num_layers'], type_dictionary.size(), train_args['arc_space'], train_args['type_space'], embed_word=None, pos=train_args['use_pos'], char=train_args['use_char'], init_emb=False, prelstm_args=train_args['prelstm_args'], elmo=train_args['elmo'], lattice=lexicon, delex=train_args['delex'], word_dictionary=word_dictionary, char_dictionary=char_dictionary, use_gpu=use_gpu)
 if use_gpu:
   network.cuda()
 model_id = None
 if args.epoch !=-1:
   model_id = args.epoch
 else:
+  print("args.pred_folder",args.pred_folder)
   model_id = max([ int(file.split('/')[-1].split('_')[-1].split('.')[0]) for file in glob.glob(os.path.join(args.pred_folder, 'model', '*'))])
   model_id = str(model_id)
 model_path = os.path.join(args.pred_folder, 'model', 'model_epoch_'+str(model_id)+'.pt')
@@ -109,6 +102,7 @@ network.eval()
 pred_writer = CoNLLWriter(word_dictionary, char_dictionary, pos_dictionary, type_dictionary)
 pred_writer.start(tb_out_path)
 g_lcorr, g_total = 0.0, 0
+print("--> lexi " , lexicon)
 with torch.no_grad():
   for batch in data_reader.iterate_batch_variable(data_test, train_args['batch_size']):
     if lexicon!=None:
@@ -116,6 +110,7 @@ with torch.no_grad():
       heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=train_args['decode'], input_morph=morph, vocab_expand=[oov_embed_dict, raw_words])
     else:
       word, char, pos, xpos, heads, types, masks, lengths, order_ids, raw_words, raw_lines = batch
+      print("word, type ", word.type())
       heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=train_args['decode'], vocab_expand=[oov_embed_dict, raw_words])
     word = word.data.cpu().numpy()
     pos = pos.data.cpu().numpy()
@@ -155,4 +150,4 @@ if not ONLY_PRED:
     print("Adding evaluation eval07")
 
 print("PREDICTION DONE {} pred_folder {} tb_out ".format(args.pred_folder,args.tb_out ))
-open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("PREDICTION DONE {} pred_folder {} tb_out \n ".format(args.pred_folder,args.tb_out))
+#open("/scratch/bemuller/parsing/sosweet/processing/logs/catching_errors.txt","a").write("PREDICTION DONE {} pred_folder {} tb_out \n ".format(args.pred_folder,args.tb_out))

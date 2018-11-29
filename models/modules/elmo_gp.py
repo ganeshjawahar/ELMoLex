@@ -19,6 +19,7 @@ from .linear import BiLinear
 from .attention import BiAttention
 from .elmo import Elmo
 from ..functions.mst import mst
+import pdb 
 
 class ElmoGP(nn.Module):
   def __init__(self, word_dim, num_words, char_dim, num_chars, pos_dim, num_pos, num_xpos, num_filters, kernel_size, hidden_size, num_layers, num_labels,
@@ -127,7 +128,7 @@ class ElmoGP(nn.Module):
         print("INFO : ELMo loaded from {} ".format(prelstm_args))
 
       else:
-        self.elmo = Elmo(prelstm_args, p_rnn, kernel_size, p_in, word_dictionary, char_dictionary)
+        self.elmo = Elmo(prelstm_args, p_rnn, kernel_size, p_in)#, word_dictionary, char_dictionary)
       if not prelstm_args.endswith('hdf5'):
         self.scalar_parameters = ParameterList([Parameter(torch.FloatTensor([0.0])) for _ in range(self.num_layers+1)])
         self.gamma = Parameter(torch.FloatTensor([1.0]))
@@ -167,6 +168,11 @@ class ElmoGP(nn.Module):
     features = []
     if self.delex==False:
       # [batch, length, word_dim]
+
+      #pdb.set_trace()
+      print("decoding ? ",input_word.type(), flush=True)
+      print("decoding mask ? ",mask.type(), flush=True)
+      #input_word = input_word.type(torch.cuda.FloatTensor)
       word = self.word_embed(input_word)
       if vocab_expand!=None and vocab_expand[0]!=None:
         # expand word vocab
@@ -293,7 +299,7 @@ class ElmoGP(nn.Module):
       input = torch.cat([input, features[i+1]], dim=2) 
 
     # output from rnn [batch, length, hidden_size]
-    output, hn, _ = self.rnn(input, mask, hx=hx)
+    output, hn, _ = self.rnn(input_word, mask, hx=hx)
 
     # apply dropout for output
     # [batch, length, hidden_size] --> [batch, hidden_size, length] --> [batch, length, hidden_size]
@@ -388,6 +394,14 @@ class ElmoGP(nn.Module):
 
   def decode(self, input_word, input_char, input_pos, input_xpos, mask=None, length=None, hx=None, leading_symbolic=0, decode='mst', input_morph=None, vocab_expand=None):
     if decode == 'mst':
+      print("DEBUG decode()) , ", input_word.type())
+      print("DEBUG input_char()) , ", input_char.type())
+      print("DEBUG input_pos()) , ", input_pos.type())
+      print("DEBUG input_xpos()) , ", input_xpos.type())
+      #mask = mask.type(torch.cuda.LongTensor)
+      print("DEBUG mask()) , ", mask.type())
+      print("DEBUG length()) , ", length.type())
+      print("DEBUG hx()) , ", hx)
       return self.decode_mst(input_word, input_char, input_pos, input_xpos, mask, length, hx, leading_symbolic, input_morph, vocab_expand)
     return self.decode_greedy(input_word, input_char, input_pos, input_xpos, mask, length, hx, leading_symbolic, input_morph)
   
