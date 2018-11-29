@@ -170,8 +170,7 @@ class ElmoGP(nn.Module):
       # [batch, length, word_dim]
 
       #pdb.set_trace()
-      print("decoding ? ",input_word.type(), flush=True)
-      print("decoding mask ? ",mask.type(), flush=True)
+     
       #input_word = input_word.type(torch.cuda.FloatTensor)
       word = self.word_embed(input_word)
       if vocab_expand!=None and vocab_expand[0]!=None:
@@ -293,13 +292,13 @@ class ElmoGP(nn.Module):
         morph_master = torch.stack(morph_master).view(bsize, max_sent_len, -1)
         morph_master = self.dropout_in(morph_master)
         features.append(morph_master)
-    
+    #ez iezezlgh 
     input = features[0]
     for i in range(len(features)-1):
       input = torch.cat([input, features[i+1]], dim=2) 
 
     # output from rnn [batch, length, hidden_size]
-    output, hn, _ = self.rnn(input_word, mask, hx=hx)
+    output, hn, _ = self.rnn(input, mask, hx=hx)
 
     # apply dropout for output
     # [batch, length, hidden_size] --> [batch, hidden_size, length] --> [batch, length, hidden_size]
@@ -394,14 +393,7 @@ class ElmoGP(nn.Module):
 
   def decode(self, input_word, input_char, input_pos, input_xpos, mask=None, length=None, hx=None, leading_symbolic=0, decode='mst', input_morph=None, vocab_expand=None):
     if decode == 'mst':
-      print("DEBUG decode()) , ", input_word.type())
-      print("DEBUG input_char()) , ", input_char.type())
-      print("DEBUG input_pos()) , ", input_pos.type())
-      print("DEBUG input_xpos()) , ", input_xpos.type())
-      #mask = mask.type(torch.cuda.LongTensor)
-      print("DEBUG mask()) , ", mask.type())
-      print("DEBUG length()) , ", length.type())
-      print("DEBUG hx()) , ", hx)
+   
       return self.decode_mst(input_word, input_char, input_pos, input_xpos, mask, length, hx, leading_symbolic, input_morph, vocab_expand)
     return self.decode_greedy(input_word, input_char, input_pos, input_xpos, mask, length, hx, leading_symbolic, input_morph)
   

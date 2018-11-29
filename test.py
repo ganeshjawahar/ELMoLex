@@ -31,7 +31,7 @@ if not os.path.exists(pred_trees_path):
 tb_out_path = os.path.join(args.pred_folder, 'pred_trees', args.tb_out) if args.tb_out == 'pred_tree.conllu' else args.tb_out
 if os.path.exists(tb_out_path):
   print('%s already exists. So over-writing it.'%(tb_out_path))
-use_gpu = False
+use_gpu = False 
 print('loading dictionaries...')
 dict_folder = os.path.join(args.pred_folder, 'dict')
 word_dictionary = Dictionary('word', default_value=True, singleton=True)
@@ -102,7 +102,6 @@ network.eval()
 pred_writer = CoNLLWriter(word_dictionary, char_dictionary, pos_dictionary, type_dictionary)
 pred_writer.start(tb_out_path)
 g_lcorr, g_total = 0.0, 0
-print("--> lexi " , lexicon)
 with torch.no_grad():
   for batch in data_reader.iterate_batch_variable(data_test, train_args['batch_size']):
     if lexicon!=None:
