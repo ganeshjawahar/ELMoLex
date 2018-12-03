@@ -54,7 +54,10 @@ class Dictionary(object):
   def save(self, output_directory, name=None):
     saving_name = name if name else self.__name
     try:
-      json.dump(self.get_content(), open(os.path.join(output_directory, saving_name + ".json"), 'w'), indent=4)
+      dic_dir = os.path.join(output_directory, saving_name + ".json")
+      if os.path.isfile(dic_dir):
+        print("Overwriting dictionary {}".format(dic_dir))
+      json.dump(self.get_content(), open(dic_dir, 'w'), indent=4)
     except Exception as e:
       raise RuntimeError("Dictionary is not saved: %s" % repr(e))
 
