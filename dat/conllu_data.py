@@ -27,9 +27,9 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
   xpos_dictionary = Dictionary('xpos', default_value=True)
   type_dictionary = Dictionary('type', default_value=True)
 
+  char_dictionary.add(PAD_CHAR)
   if add_start_char:
     char_dictionary.add(CHAR_START)
-  char_dictionary.add(PAD_CHAR)
   pos_dictionary.add(PAD_POS)
   xpos_dictionary.add(PAD_POS)
   type_dictionary.add(PAD_TYPE)
@@ -238,16 +238,16 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       else:
         shift = 0
       for c, cids in enumerate(cid_seqs):
-        cid_inputs[i, 0, :len(cids)] = CHAR_START_ID
-        cid_inputs[i, 0, len(cids):] = PAD_ID_CHAR
-        cid_inputs[i, c+shift, :len(cids)] = cids
-        #cid_inputs[i, 0, len(cids)+1] = X
-        cid_inputs[i, c+shift, len(cids):] = PAD_ID_CHAR
+        if add_start_char:
+          cid_inputs[i, c, 0] = CHAR_START_ID
+        cid_inputs[i, c, shift:len(cids)+shift] = cids
+        cid_inputs[i, c, shift+len(cids):] = PAD_ID_CHAR
       # --
       #for c, cids in enumerate(cid_seqs):
       #  cid_inputs[i, c, :len(cids)] = cids
       #  cid_inputs[i, c, len(cids):] = PAD_ID_CHAR
-      #cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
+      cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
+      # cid_inputs is batch_size, sent_len padded, word lenths padded
       # --
       # pos ids
       pid_inputs[i, :inst_size] = pids
