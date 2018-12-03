@@ -2,7 +2,8 @@ import sys
 import codecs
 import os
 
-from .constants import MAX_CHAR_LENGTH, NUM_CHAR_PAD, PAD_CHAR, PAD_POS, PAD_TYPE, ROOT_CHAR, ROOT_POS, ROOT_TYPE, END_CHAR, END_POS, END_TYPE, _START_VOCAB, ROOT, PAD_ID_WORD, PAD_ID_CHAR, PAD_ID_TAG, DIGIT_RE
+from .constants import MAX_CHAR_LENGTH, NUM_CHAR_PAD, PAD_CHAR, PAD_POS, PAD_TYPE, ROOT_CHAR, ROOT_POS,\
+  ROOT_TYPE, END_CHAR, END_POS, END_TYPE, _START_VOCAB, ROOT, PAD_ID_WORD, PAD_ID_CHAR, PAD_ID_TAG, DIGIT_RE, CHAR_START_ID, CHAR_START
 from .conllu_reader import CoNLLReader
 from .dictionary import Dictionary
 import numpy as np
@@ -12,7 +13,7 @@ torch.manual_seed(123)
 from torch.autograd import Variable
 
 
-def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry_run, vocab_trim=False):
+def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry_run, vocab_trim=False, add_start_char=0):
   """
   Given train, dev, test treebanks and a word embedding matrix :
   - basic mode : create key_value instanes for each CHAR, WORD, U|X-POS , Relation with special cases for Roots, Padding and End symbols
@@ -26,6 +27,8 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
   xpos_dictionary = Dictionary('xpos', default_value=True)
   type_dictionary = Dictionary('type', default_value=True)
 
+  if add_start_char:
+    char_dictionary.add(CHAR_START)
   char_dictionary.add(PAD_CHAR)
   pos_dictionary.add(PAD_POS)
   xpos_dictionary.add(PAD_POS)
@@ -181,7 +184,10 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
   return data, max_char_length, _buckets
 
 
-def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False, symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None):
+def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary,
+                          type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False,
+                          symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None,
+                          add_start_char=0):
   """
   Given data ovject form read_variable creates array-like  variables for character, word, pos, relation, heads ready to be fed to a network
   """
@@ -226,10 +232,23 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       # word ids
       wid_inputs[i, :inst_size] = wids
       wid_inputs[i, inst_size:] = PAD_ID_WORD
+
+      if add_start_char:
+        shift = 1
+      else:
+        shift = 0
       for c, cids in enumerate(cid_seqs):
-        cid_inputs[i, c, :len(cids)] = cids
-        cid_inputs[i, c, len(cids):] = PAD_ID_CHAR
-      cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
+        cid_inputs[i, 0, :len(cids)] = CHAR_START_ID
+        cid_inputs[i, 0, len(cids):] = PAD_ID_CHAR
+        cid_inputs[i, c+shift, :len(cids)] = cids
+        #cid_inputs[i, 0, len(cids)+1] = X
+        cid_inputs[i, c+shift, len(cids):] = PAD_ID_CHAR
+      # --
+      #for c, cids in enumerate(cid_seqs):
+      #  cid_inputs[i, c, :len(cids)] = cids
+      #  cid_inputs[i, c, len(cids):] = PAD_ID_CHAR
+      #cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
+      # --
       # pos ids
       pid_inputs[i, :inst_size] = pids
       pid_inputs[i, inst_size:] = PAD_ID_TAG

@@ -126,11 +126,7 @@ def save_train_args(path, args, other_args):
   save_args["n_trainable_params"] = other_args[10]
 
   file_path = os.path.join(path, 'args.json')
-  if os.path.isfile(file_path):
-    name = input("Do you want to overwrite {} ? yes/no (Default is No) ".format(file_path))
-    if name == "" or name == "no":
-      raise Exception("{} exists : you don't want to overwrite your model ".format(file_path))
-
+  
   json.dump(save_args, open(file_path, 'w'), indent=4)
   print('saved settings as a json in: '+str(file_path))
 

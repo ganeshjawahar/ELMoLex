@@ -34,8 +34,8 @@ MODEL_ID=${_id_run:0:6}
 PROJECT_PATH="/home/benjamin/parsing/ELMolex_sosweet"
 
 
-#MODEL_NAME="cf6257-REAL_ELMO"
-MODEL_NAME="TES2T"
+MODEL_NAME="cf6257-REAL_ELMO"
+#MODEL_NAME="TES2T"
 
 PARSER_PATH=$PROJECT_PATH/sosweet_run/parser_models/$MODEL_NAME-parser
 test_data="cb2"
@@ -56,7 +56,7 @@ FAIR_VECTOR_PATH="/home/benjamin/parsing/NeuroTagger/word_embedding/fasttext_vec
 ELMO_PATH="$PROJECT_PATH/sosweet_run/elmo_models/$MODEL_NAME-elmo"
 LEXICON=0
 RANDOM_INIT=0
-EPOCHS=1
+EPOCHS=130
 
 #mkdir $PARSER_PATH
 #mkdir $PREDICTION_PATH
@@ -71,7 +71,7 @@ _SYSTEM_DATA_PRED_TAG="$_GOLD_DATA"
 #CUDA_VISIBLE_DEVICES=$GPU python nlm.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec.sample \
 #-train_path "$TRAINING_SET" --dev_path "$DEV_SET" --test_path "$TEST_SET" --dest_path $ELMO_PATH --num_epochs 1
 ELMO=1
-python train.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec.sample \
+python train.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec \
 --train_path "$TRAINING_SET" --dev_path "$DEV_SET" --test_path "$TEST_SET" --dest_path "$PARSER_PATH" \
 --lexicon $LEXICON --random_init $RANDOM_INIT  --num_epochs $EPOCHS --elmo $ELMO --pos $POS  $char_script --prelstm_args "/home/benjamin/parsing/ELMolex_sosweet/elmo_sosweet/95391-deff507-ELMO-weights.hdf5" --batch_size 33
 

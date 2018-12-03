@@ -109,7 +109,6 @@ with torch.no_grad():
       heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=train_args['decode'], input_morph=morph, vocab_expand=[oov_embed_dict, raw_words])
     else:
       word, char, pos, xpos, heads, types, masks, lengths, order_ids, raw_words, raw_lines = batch
-      print("word, type ", word.type())
       heads_pred, types_pred = network.decode(word, char, pos, xpos, mask=masks, length=lengths, leading_symbolic=NUM_SYMBOLIC_TAGS, decode=train_args['decode'], vocab_expand=[oov_embed_dict, raw_words])
     word = word.data.cpu().numpy()
     pos = pos.data.cpu().numpy()

@@ -32,11 +32,18 @@ print("CHAR set to ", str(args.char))
 
 use_gpu = torch.cuda.is_available()
 print("GPU found: "+str(use_gpu))
+
+
+
 print('storing everything in '+str(args.dest_path))
 dict_path = os.path.join(args.dest_path, 'dict')
 models_path = os.path.join(args.dest_path, 'model')
 if not os.path.exists(args.dest_path):
   os.makedirs(args.dest_path)
+else:
+  name = input("{} exists : Do you want to overwrite what's in it ? yes/no (Default is No) ".format(args.dest_path))
+  if name == "" or name == "no":
+    raise Exception("{} exists : you don't want to overwrite your model ".format(args.dest_path))
 if not os.path.exists(dict_path):
   os.makedirs(dict_path)
 if not os.path.exists(models_path):

@@ -47,8 +47,11 @@ trained_on="cb2+fqb+ftb"
 #TEST_DIR="/home/benjamin/parsing/ELMolex_sosweet/data/ud_output"
 TEST_DIR="/home/benjamin/parsing/ELMolex_sosweet/data/ud_tag-gold_dep"
 
-report="$PROJECT_PATH/reports/$MODEL_NAME-reports-X.txt"
-echo "Writing to $report "
+EXTRA_LABEL="A"
+report="$PROJECT_PATH/reports/$MODEL_NAME-reports-$EXTRA_LABEL.txt"
+report_perf="$PROJECT_PATH/reports/$MODEL_NAME-performance-$EXTRA_LABEL.txt"
+
+echo "WRITING to $report and $report_perf "
 echo "MODEL_NAME : $MODEL_NAME" > $report
 echo "We work on gold tokenization (coming from ftb, fqb, cb2 spmrl ish transofmred to conll)" 
 echo "We work on gold tokenization (coming from ftb, fqb, cb2 spmrl ish transofmred to conll)" >> $report
@@ -61,7 +64,7 @@ if [ "$MODEL_NAME" == "cf6257-REAL_ELMO" ] ; then
 LEXICON="0"
 fi 
 
-w2v_dir="$FAIR_VECTOR_PATH/cc.fr.300.vec.sample"
+w2v_dir="$FAIR_VECTOR_PATH/cc.fr.300.vec"
 GPU=0
 # evaluating on cb1
 #for test_data in "cb1" "cb1-1_2" "cb2" "$DATA_SET_NAME" "fqb+ftb" "fqb" "ftb"  ; 
@@ -97,14 +100,14 @@ evaluation_script="/home/benjamin/parsing/NeuroNLP2/evaluation/eval07.pl"
 echo "------------------------------ ADDING REPORT ------------------------" >> $report 
 perl $evaluation_script -g "$_GOLD_DATA" -s "$_TB"  >> $report 
 perl $evaluation_script -g "$_GOLD_DATA" -s "$_TB"  >> $report.$test_data.$data_to_test
-report_perf="$PROJECT_PATH/reports/$MODEL_NAME-performance-X.txt"
 echo "SCORE ON $test_data - $data_to_test (of $_TB) " >> $report_perf
+echo "WRITING to $report.$test_data.$data_to_test "
 LAS=`grep  " Labeled   attachment score:" $report.$test_data.$data_to_test `
 UAS=`grep  " Unlabeled attachment score:" $report.$test_data.$data_to_test`
-echo "test:$test_data;pipe:$data_to_test;train:$trained_on;LAS:$LAS;UAS:$UAS" >> $report_perf
-echo "Test on : $test_data $data_to_test trained on : $trained_on , LAS:$LAS,UAS:$UAS | written to $report_perf "
-echo " report perf written $report_perf with $test_data test as well as $report.$test_data.$data_to_test report "
-echo " full report written $report " 
+echo "model:$MODEL_NAME,test:$test_data;pipe:$data_to_test;train:$trained_on;LAS:$LAS;UAS:$UAS" >> $report_perf
+echo "WRITTEN to  $report_perf : Test on : $test_data $data_to_test trained on : $trained_on , LAS:$LAS,UAS:$UAS "
+echo "WRITTEN report perf written $report_perf with $test_data test as well as $report.$test_data.$data_to_test report "
+echo "WRITTEN full report written $report " 
 done
 done 
 
