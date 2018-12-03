@@ -242,9 +242,6 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
           cid_inputs[i, c, 0] = CHAR_START_ID
         cid_inputs[i, c, shift:len(cids)+shift] = cids
         cid_inputs[i, c, shift+len(cids):] = PAD_ID_CHAR
-      # --
-      #for c, cids in enumerate(cid_seqs):
-      #  cid_inputs[i, c, :len(cids)] = cids
       #  cid_inputs[i, c, len(cids):] = PAD_ID_CHAR
       cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
       # cid_inputs is batch_size, sent_len padded, word lenths padded
