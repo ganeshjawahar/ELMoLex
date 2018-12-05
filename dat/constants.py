@@ -18,13 +18,18 @@ _START_VOCAB = [PAD, ROOT, END]
 CHAR_START = u"_START"
 
 UNK_ID = 0
+# we add this for normalization (no change if add_char_start==0 in create_dict + read_data
 CHAR_START_ID = 2
+CHAR_END_ID = 4
 PAD_ID_CHAR = 1
 
 PAD_ID_WORD = 1
 PAD_ID_TAG = 1
 PAD_ID_MORPH = 1
 ROOT_ID_MORPH = 2
+
+
+
 
 import re
 DIGIT_RE = re.compile(br"\d")

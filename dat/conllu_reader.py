@@ -3,6 +3,7 @@ import sys
 from .ioutils import DependencyInstance, Sentence
 from .constants import DIGIT_RE, MAX_CHAR_LENGTH, NUM_CHAR_PAD, ROOT, ROOT_CHAR, ROOT_POS, ROOT_TYPE, PAD
 
+
 class CoNLLReader(object):
 
   def __init__(self, file_path, word_dictionary, char_dictionary, pos_dictionary, type_dictionary, xpos_dictionary, lemma_dictionary):
@@ -25,7 +26,7 @@ class CoNLLReader(object):
 
     # skip multiple blank lines.
     raw_text = []
-    while len(line) > 0 and (len(line.strip()) == 0 or line.strip()[0]=='#'):
+    while len(line) > 0 and (len(line.strip()) == 0 or line.strip()[0] == '#'):
       if line.strip()[0] == '#':
         raw_text.append(line)
       line = self.__source_file.readline()

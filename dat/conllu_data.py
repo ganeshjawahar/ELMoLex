@@ -3,7 +3,7 @@ import codecs
 import os
 
 from .constants import MAX_CHAR_LENGTH, NUM_CHAR_PAD, PAD_CHAR, PAD_POS, PAD_TYPE, ROOT_CHAR, ROOT_POS,\
-  ROOT_TYPE, END_CHAR, END_POS, END_TYPE, _START_VOCAB, ROOT, PAD_ID_WORD, PAD_ID_CHAR, PAD_ID_TAG, DIGIT_RE, CHAR_START_ID, CHAR_START
+  ROOT_TYPE, END_CHAR, END_POS, END_TYPE, _START_VOCAB, ROOT, PAD_ID_WORD, PAD_ID_CHAR, PAD_ID_TAG, DIGIT_RE, CHAR_START_ID, CHAR_START, CHAR_END_ID
 from .conllu_reader import CoNLLReader
 from .dictionary import Dictionary
 import numpy as np
@@ -149,7 +149,7 @@ def create_dict(dict_path, train_path, dev_path, test_path, word_embed_dict, dry
 
 def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary,
               max_size=None, normalize_digits=True,
-              symbolic_root=False, symbolic_end=False, dry_run=False):
+              symbolic_root=False, symbolic_end=False, dry_run=False, verbose=0):
   """
   Given vocabularies , data_file :
   - creates a  list of bucket
@@ -160,7 +160,8 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
   last_bucket_id = len(_buckets) - 1
   data = [[] for _ in _buckets]
   max_char_length = [0 for _ in _buckets]
-  print('Reading data from %s' % source_path)
+  if verbose>=1:
+    print('Reading data from %s' % source_path)
   counter = 0
   reader = CoNLLReader(source_path, word_dictionary, char_dictionary, pos_dictionary, type_dictionary, xpos_dictionary, None)
   inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
@@ -186,12 +187,12 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
 
 def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary,
                           type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False,
-                          symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None,
-                          add_start_char=0):
+                          symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None,verbose=0,
+                          add_end_char=0, add_start_char=0):
   """
   Given data ovject form read_variable creates array-like  variables for character, word, pos, relation, heads ready to be fed to a network
   """
-  data, max_char_length, _buckets = read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, max_size=max_size, normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end, dry_run=dry_run)
+  data, max_char_length, _buckets = read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, verbose=verbose, max_size=max_size, normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end, dry_run=dry_run)
   bucket_sizes = [len(data[b]) for b in range(len(_buckets))]
 
   data_variable = []
@@ -203,9 +204,8 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
     if bucket_size == 0:
       data_variable.append((1, 1))
       continue
-
     bucket_length = _buckets[bucket_id]
-    char_length = min(MAX_CHAR_LENGTH, max_char_length[bucket_id] + NUM_CHAR_PAD)
+    char_length = min(MAX_CHAR_LENGTH, max_char_length[bucket_id] + NUM_CHAR_PAD+add_end_char)
     wid_inputs = np.empty([bucket_size, bucket_length], dtype=np.int64)
     cid_inputs = np.empty([bucket_size, bucket_length, char_length], dtype=np.int64)
     pid_inputs = np.empty([bucket_size, bucket_length], dtype=np.int64)
@@ -237,11 +237,18 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
         shift = 1
       else:
         shift = 0
+      if add_end_char:
+        shift_end = 1
+      else:
+        shift_end = 0
       for c, cids in enumerate(cid_seqs):
         if add_start_char:
           cid_inputs[i, c, 0] = CHAR_START_ID
         cid_inputs[i, c, shift:len(cids)+shift] = cids
-        cid_inputs[i, c, shift+len(cids):] = PAD_ID_CHAR
+        if add_end_char:
+          cid_inputs[i, c, len(cids)+shift+shift_end] = CHAR_END_ID
+
+        cid_inputs[i, c, shift+len(cids)+shift_end:] = PAD_ID_CHAR
       #  cid_inputs[i, c, len(cids):] = PAD_ID_CHAR
       cid_inputs[i, inst_size:, :] = PAD_ID_CHAR
       # cid_inputs is batch_size, sent_len padded, word lenths padded
@@ -293,6 +300,7 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
     data_variable.append((words, chars, pos, xpos, heads, types, masks, single, lengths, order_inputs, raw_word_inputs, raw_lines))
   return data_variable, bucket_sizes, _buckets
 
+
 def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
   """
   Given read_data_to_variable() get a random batch
@@ -312,6 +320,8 @@ def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
 
   words, chars, pos, xpos, heads, types, masks, single, lengths, order_inputs, _, _ = data_variable[bucket_id]
   bucket_size = bucket_sizes[bucket_id]
+  #print("INFO : BUCKET SIZE {}  BATCH SIZE {} (in conllu_data)".format(bucket_size, batch_size))
+
   batch_size = min(bucket_size, batch_size)
   index = torch.randperm(bucket_size).long()[:batch_size]
   if words.is_cuda:

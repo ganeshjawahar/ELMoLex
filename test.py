@@ -20,10 +20,13 @@ import torch
 from misc.conll18_ud_eval import load_conllu_file, evaluate
 
 # TODO (very ugly) so meant to be cleaned ! 
-ONLY_PRED = False  
-print("WARNING : ONLY_PRED IS {}".format(ONLY_PRED))
+#ONLY_PRED = True  
 args = test_args.parse_test_args()
-
+if len(args.gold_tb)==0:
+  ONLY_PRED=True
+else:
+  ONLY_PRED=False
+print("WARNING : ONLY_PRED IS {} because gold_tb {} was provided as so ".format(ONLY_PRED, args.gold_tb))
 pred_trees_path = os.path.join(args.pred_folder, 'pred_trees')
 if not os.path.exists(pred_trees_path):
   os.makedirs(pred_trees_path)
@@ -31,7 +34,7 @@ if not os.path.exists(pred_trees_path):
 tb_out_path = os.path.join(args.pred_folder, 'pred_trees', args.tb_out) if args.tb_out == 'pred_tree.conllu' else args.tb_out
 if os.path.exists(tb_out_path):
   print('%s already exists. So over-writing it.'%(tb_out_path))
-use_gpu = False 
+use_gpu = True 
 print('loading dictionaries...')
 dict_folder = os.path.join(args.pred_folder, 'dict')
 word_dictionary = Dictionary('word', default_value=True, singleton=True)
@@ -67,16 +70,15 @@ if 'conllul' in train_args['lexicon']:
       lexicon[0].addFeaturesForOOVWords(oov_test_words, args.lexicon)
 
 oov_embed_dict = None
-if not ONLY_PRED:
-  if args.vocab_expand:
-    # TODO = offset for elmolex_sosweet prediction
-    oov_test_words = ioutils.getOOVWords(word_dictionary, args.system_tb)
-    print('adding word embedding info for %d oov words'%(len(oov_test_words)))
-    oov_embed_dict, embed_dim = ioutils.load_word_embeddings(args.word_path, False, None, oov_test_words)
-    for oov_word in oov_embed_dict:
-      oov_embed_dict[oov_word] = torch.from_numpy(oov_embed_dict[oov_word])
-    assert(train_args['word_dim']==embed_dim)
-    print('word embeddings for %d/%d oov words fetched'%(len(oov_embed_dict), len(oov_test_words)))
+if args.vocab_expand:
+  # TODO = offset for elmolex_sosweet prediction
+  oov_test_words = ioutils.getOOVWords(word_dictionary, args.system_tb)
+  print('adding word embedding info for %d oov words'%(len(oov_test_words)))
+  oov_embed_dict, embed_dim = ioutils.load_word_embeddings(args.word_path, False, None, oov_test_words)
+  for oov_word in oov_embed_dict:
+    oov_embed_dict[oov_word] = torch.from_numpy(oov_embed_dict[oov_word])
+  assert(train_args['word_dim']==embed_dim)
+  print('word embeddings for %d/%d oov words fetched'%(len(oov_embed_dict), len(oov_test_words)))
 data_test = data_reader.read_data_to_variable(args.system_tb, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, use_gpu=use_gpu, volatile=True, symbolic_root=True, dry_run=False, lattice=lexicon)
 num_test_data = sum(data_test[1])
 print('No. of sentences (system_tb) = %d'%(num_test_data))

@@ -8,7 +8,7 @@ def parse_test_args():
   args_parser.add_argument('--pred_folder', type=str, default='/home/ganesh/objects/neurogp/run1', help='folder containing the trained models, dictionaries and settings')
 
   args_parser.add_argument('--system_tb', type=str, default='/home/ganesh/objects/conll18/udpipe-trained/direct/ud-en_lines/en_lines-ud-eval-ud.conllu', help='Name of the CoNLL-U file with the predicted data.')
-  args_parser.add_argument('--gold_tb', type=str, default='/home/ganesh/objects/conll18/udpipe-trained/direct/ud-en_lines/en_lines-ud-eval-gold.conllu', help='Name of the CoNLL-U file with the gold data.')
+  args_parser.add_argument('--gold_tb', type=str, default='', help='Name of the CoNLL-U file with the gold data.')
   args_parser.add_argument('--tb_out', type=str, default='pred_tree.conllu', help='file name for writing the predicted parse tree')
   args_parser.add_argument('--sosweet', type=bool, default=-0, help='for evaluation purposes : sosweet will use eval07.pl ')
 

@@ -1,6 +1,7 @@
 import json
 import os
 
+
 class Dictionary(object):
 
   def __init__(self, name, default_value=False, keep_growing=True, singleton=False):
