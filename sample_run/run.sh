@@ -34,7 +34,7 @@ MODEL_ID=${_id_run:0:6}
 PROJECT_PATH="/home/benjamin/parsing/ELMolex_sosweet"
 
 
-MODEL_NAME="cf6257-REAL_ELMO"
+MODEL_NAME=$MODEL_ID"-REAL_ELMO+ELMOLEX"
 #MODEL_NAME="TES2T"
 
 PARSER_PATH=$PROJECT_PATH/sosweet_run/parser_models/$MODEL_NAME-parser
@@ -42,10 +42,13 @@ test_data="cb2"
 PREDICTION_PATH=$PARSER_PATH/predictions
 DATA_PATH="$PROJECT_PATH/data/ud_tag-gold_dep"
 DATA_SET_NAME="cb2+fqb+ftb"
-TRAINING_SET="${DATA_PATH}${TRAIN_FOLDER}/$DATA_SET_NAME.train-ud_pred_tag_only-01-udpipe1.2.conllu"
-DEV_SET="${DATA_PATH}${TRAIN_FOLDER}/$DATA_SET_NAME.dev-ud_pred_tag_only-01-udpipe1.2.conllu"
-TEST_SET="${DATA_PATH}${TEST_FOLDER}/$DATA_SET_NAME.test-ud_pred_tag_only-01-udpipe1.2.conllu"
-_SYSTEM_DATA_PRED_TAG="${DATA_PATH}$TEST_FOLDER/$test_data.test-ud_pred_tag_only-01-udpipe1.2.conllu"
+
+label_pred_tag="01"
+#label_pred_tag="ugc+standart_trained"
+TRAINING_SET="${DATA_PATH}${TRAIN_FOLDER}/$DATA_SET_NAME.train-ud_pred_tag_only-$label_pred_tag-udpipe1.2.conllu"
+DEV_SET="${DATA_PATH}${TRAIN_FOLDER}/$DATA_SET_NAME.dev-ud_pred_tag_only-$label_pred_tag-udpipe1.2.conllu"
+TEST_SET="${DATA_PATH}${TEST_FOLDER}/$DATA_SET_NAME.test-ud_pred_tag_only-$label_pred_tag-udpipe1.2.conllu"
+_SYSTEM_DATA_PRED_TAG="${DATA_PATH}$TEST_FOLDER/$test_data.test-ud_pred_tag_only-$label_pred_tag-udpipe1.2.conllu"
 
 GPU=1
 ELMO=1
@@ -71,11 +74,14 @@ _SYSTEM_DATA_PRED_TAG="$_GOLD_DATA"
 #CUDA_VISIBLE_DEVICES=$GPU python nlm.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec.sample \
 #-train_path "$TRAINING_SET" --dev_path "$DEV_SET" --test_path "$TEST_SET" --dest_path $ELMO_PATH --num_epochs 1
 ELMO=1
-python train.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec \
+running="python train.py --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec \
 --train_path "$TRAINING_SET" --dev_path "$DEV_SET" --test_path "$TEST_SET" --dest_path "$PARSER_PATH" \
---lexicon $LEXICON --random_init $RANDOM_INIT  --num_epochs $EPOCHS --elmo $ELMO --pos $POS  $char_script --prelstm_args "/home/benjamin/parsing/ELMolex_sosweet/elmo_sosweet/95391-deff507-ELMO-weights.hdf5" --batch_size 33
+--lexicon $LEXICON --random_init $RANDOM_INIT  --num_epochs $EPOCHS --elmo $ELMO --pos $POS  $char_script --prelstm_args  /home/benjamin/parsing/ELMolex_sosweet/elmo_sosweet/95537-0abddca-ELMO_14_17-run-BACKPUP-model.ckpt-1392500/95537-0abddca-ELMO_14_17-run-BACKPUP-model.ckpt-1392500.hdf5  --batch_size 33"
+echo "RUNNING $running"
+echo "RUNNING $running"  >> ./log-$MODEL_NAME-run.sh
+$running
 
-
+# FIRST TRAIN ELMO : "/home/benjamin/parsing/ELMolex_sosweet/elmo_sosweet/95391-deff507-ELMO-weights.hdf5"
 #CUDA_VISIBLE_DEVICES=$GPU python test.py --pred_folder "$PARSER_PATH" --system_tb "$_SYSTEM_DATA_PRED_TAG" --gold_tb "$_GOLD_DATA" --tb_out "$PREDICTION_PATH/$test_data-test-pred.conll" --lexicon $LEXICON --word_path $FAIR_VECTOR_PATH/cc.fr.300.vec.sample  --sosweet 1  > $PARSER_PATH/report_full.txt
 
 #_GOLD_DATA="$PROJECT_PATH/../data/sosweet/test_2_conll/cb1-1_2-w_hash.test.conll"

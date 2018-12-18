@@ -160,8 +160,10 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
   last_bucket_id = len(_buckets) - 1
   data = [[] for _ in _buckets]
   max_char_length = [0 for _ in _buckets]
+
   if verbose>=1:
     print('Reading data from %s' % source_path)
+
   counter = 0
   reader = CoNLLReader(source_path, word_dictionary, char_dictionary, pos_dictionary, type_dictionary, xpos_dictionary, None)
   inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
@@ -171,11 +173,12 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
     sent = inst.sentence
     for bucket_id, bucket_size in enumerate(_buckets):
       if inst_size < bucket_size or bucket_id == last_bucket_id:
-        data[bucket_id].append([sent.word_ids, sent.char_id_seqs, inst.pos_ids, inst.heads, inst.type_ids, counter, sent.words, sent.raw_lines, inst.xpos_ids])
+        # TODO : add assertion I think to check that each component required is not empty + at the correct place
+        data[bucket_id].append([sent.word_ids, sent.char_id_seqs,inst.pos_ids, inst.heads, inst.type_ids, counter, sent.words, sent.raw_lines, inst.xpos_ids])
         max_len = max([len(char_seq) for char_seq in sent.char_seqs])
         if max_char_length[bucket_id] < max_len:
           max_char_length[bucket_id] = max_len
-        if bucket_id == last_bucket_id and _buckets[last_bucket_id]<len(sent.word_ids):
+        if bucket_id == last_bucket_id and _buckets[last_bucket_id] < len(sent.word_ids):
           _buckets[last_bucket_id] = len(sent.word_ids)
         break
     inst = reader.getNext(normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end)
@@ -188,15 +191,15 @@ def read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpo
 def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary,
                           type_dictionary, max_size=None, normalize_digits=True, symbolic_root=False,
                           symbolic_end=False, use_gpu=False, volatile=False, dry_run=False, lattice=None,verbose=0,
-                          add_end_char=0, add_start_char=0):
+                          add_end_char=0, add_start_char=0,
+                          normalization=False):
   """
   Given data ovject form read_variable creates array-like  variables for character, word, pos, relation, heads ready to be fed to a network
   """
+
   data, max_char_length, _buckets = read_data(source_path, word_dictionary, char_dictionary, pos_dictionary, xpos_dictionary, type_dictionary, verbose=verbose, max_size=max_size, normalize_digits=normalize_digits, symbolic_root=symbolic_root, symbolic_end=symbolic_end, dry_run=dry_run)
   bucket_sizes = [len(data[b]) for b in range(len(_buckets))]
-
   data_variable = []
-
   ss = [0] * len(_buckets)
   ss1 = [0] * len(_buckets)
   for bucket_id in range(len(_buckets)):
@@ -205,7 +208,7 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
       data_variable.append((1, 1))
       continue
     bucket_length = _buckets[bucket_id]
-    char_length = min(MAX_CHAR_LENGTH, max_char_length[bucket_id] + NUM_CHAR_PAD+add_end_char)
+    char_length = min(MAX_CHAR_LENGTH, max_char_length[bucket_id] + NUM_CHAR_PAD)
     wid_inputs = np.empty([bucket_size, bucket_length], dtype=np.int64)
     cid_inputs = np.empty([bucket_size, bucket_length, char_length], dtype=np.int64)
     pid_inputs = np.empty([bucket_size, bucket_length], dtype=np.int64)
@@ -222,8 +225,8 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
     raw_word_inputs, raw_lines = [], []
 
     for i, inst in enumerate(data[bucket_id]):
-      ss[bucket_id]+=1
-      ss1[bucket_id]=bucket_length
+      ss[bucket_id] += 1
+      ss1[bucket_id] = bucket_length
       wids, cid_seqs, pids, hids, tids, orderid, word_raw, lines, xpids = inst
       inst_size = len(wids)
       lengths_inputs[i] = inst_size
@@ -241,6 +244,8 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
         shift_end = 1
       else:
         shift_end = 0
+
+
       for c, cids in enumerate(cid_seqs):
         if add_start_char:
           cid_inputs[i, c, 0] = CHAR_START_ID
@@ -301,7 +306,7 @@ def read_data_to_variable(source_path, word_dictionary, char_dictionary, pos_dic
   return data_variable, bucket_sizes, _buckets
 
 
-def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
+def get_batch_variable(data, batch_size, unk_replace=0., lattice=None, normalization=False):
   """
   Given read_data_to_variable() get a random batch
   """
@@ -335,6 +340,7 @@ def get_batch_variable(data, batch_size, unk_replace=0., lattice=None):
     noise = Variable(masks.data.new(batch_size, bucket_length).bernoulli_(unk_replace).long())
     words = words * (ones - single[index] * noise)
 
+
   return words, chars[index], pos[index], xpos[index], heads[index], types[index], masks[index], lengths[index], order_inputs[index]
 
 def iterate_batch_variable(data, batch_size, unk_replace=0., lattice=None):
@@ -350,7 +356,7 @@ def iterate_batch_variable(data, batch_size, unk_replace=0., lattice=None):
     if bucket_size == 0:
       continue
 
-    words, chars, pos, xpos, heads, types, masks, single, lengths, order_ids, raw_word_inputs, raw_lines = data_variable[bucket_id]
+    words, chars, chars_norm, pos, xpos, heads, types, masks, single, lengths, order_ids, raw_word_inputs, raw_lines = data_variable[bucket_id]
     if unk_replace:
       ones = Variable(single.data.new(bucket_size, bucket_length).fill_(1))
       noise = Variable(masks.data.new(bucket_size, bucket_length).bernoulli_(unk_replace).long())

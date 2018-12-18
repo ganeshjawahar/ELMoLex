@@ -21,12 +21,14 @@ from misc.conll18_ud_eval import load_conllu_file, evaluate
 
 # TODO (very ugly) so meant to be cleaned ! 
 #ONLY_PRED = True  
+import sys
 args = test_args.parse_test_args()
 if len(args.gold_tb)==0:
   ONLY_PRED=True
 else:
   ONLY_PRED=False
-print("WARNING : ONLY_PRED IS {} because gold_tb {} was provided as so ".format(ONLY_PRED, args.gold_tb))
+
+print("WARNING : ONLY_PRED IS {} because gold_tb {} was provided as so ".format(ONLY_PRED, str(args.gold_tb)))
 pred_trees_path = os.path.join(args.pred_folder, 'pred_trees')
 if not os.path.exists(pred_trees_path):
   os.makedirs(pred_trees_path)
@@ -63,6 +65,7 @@ if 'conllul' in train_args['lexicon']:
   data_reader = lattice_data
   lexicon = pickle.load(open(os.path.join(args.pred_folder, 'dict', 'lexicon.pkl'), 'rb'))
   #TODO : set it to False 
+  # WHY DO YOU EXPAND ON GOLD DATA ??? 
   if not ONLY_PRED:
     if args.lex_expand:
       oov_test_words = ioutils.getOOVWords(word_dictionary, args.gold_tb)
